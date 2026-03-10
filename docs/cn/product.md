@@ -38,10 +38,10 @@ logs:   Transfer(0x..., 0x..., 115792089...)
 
 | 用户群体 | 痛点 | TokenSee 的价值 |
 |---|---|---|
-| **DApp 前端开发者** | 要展示用户交易历史，但解析 ABI + 价格换算要写大量胶水代码 | 一个 API 调用，直接拿到带摘要、资产流向和 USD 估值的 JSON |
-| **链上数据分析师** | 需要识别交易对手方是谁（交易所？巨鲸？协议？）| 内置 70+ 知名地址实体库，自动标注 Binance/Coinbase/Uniswap 等 |
-| **量化交易/套利机器人** | 需要实时监控大额资金动向，判断市场情绪 | 巨鲸预警 API + Webhook 推送，实时触达 $10 万+ 大额转账，附带机构标签 |
-| **安全/风控团队** | 需要快速判断某地址是否为已知混币器或高风险实体 | 地址实体查询接口，一键识别 Tornado Cash、已知黑名单地址 |
+| **DApp 前端开发者** | 要展示用户交易历史，但解析 ABI + 价格换算要写大量胶水代码 | 一个 API 调用，直接拿到带摘要、资产流向和 USD 估值的 JSON；API Playground 可在文档页直接试用 |
+| **链上数据分析师** | 需要识别交易对手方是谁（交易所？巨鲸？协议？）| 内置 70+ 知名地址实体库，Smart Money 追踪跟踪 VC/做市商动向，资金流图谱可视化 |
+| **量化交易/套利机器人** | 需要实时监控大额资金动向，判断市场情绪 | 巨鲸预警 + 自定义告警规则引擎（按链/资产/地址/金额精准过滤）+ Webhook 推送 |
+| **安全/风控团队** | 需要快速判断某地址是否为已知混币器或高风险实体 | MEV 识别、资金流图谱追踪路径，Tornado Cash 等风险地址实体标注 |
 | **Web3 产品经理** | 需要向投资人演示多链数据能力，不想花两周搭基础设施 | 完整的前后端一键启动，含可视化 Demo 页 |
 
 ---
@@ -113,9 +113,9 @@ GET /v1/entity/Binance/wallets
 
 ---
 
-### 🐋 卖点 3：巨鲸预警监控 + Webhook 推送
+### 🐋 卖点 3：巨鲸预警 + 自定义告警规则 + Webhook 推送
 
-**核心差异：** 这是一个真正运行的链上监控系统，而不是被动查询接口。新增 Webhook 后，预警可直接推送到用户系统，无需客户端持续保持连接。
+**核心差异：** 这是一个真正运行的链上监控系统。不只是简单阈值过滤——自定义规则引擎让用户精准定义「哪种预警值得推送」，支持多维度条件组合，推送到独立 Webhook URL，覆盖所有主流场景。
 
 **工作机制：**
 - ETH 每 30s、BSC 每 15s、ARB/BASE/OP/POLYGON 每 45s（错峰调度，避免 Alchemy 并发限速）、AVAX 每 60s 扫描新区块
@@ -134,6 +134,26 @@ GET /v1/entity/Binance/wallets
 | `bridge_withdrawal` | 已知跨链桥 → 任意地址 | 资金从其他链流入 |
 | `whale_movement` | 已知基金/巨鲸互转 | 机构资产调仓 |
 | `large_transfer` | 未知地址大额转移 | 新巨鲸出没，值得追踪 |
+
+**自定义告警规则（Rule Engine）：**
+
+用户可创建规则，当预警满足以下任意组合条件时，定向推送到指定 Webhook：
+
+```json
+// 示例规则：以太坊上 USDC 大额流入交易所（≥$500K）
+{
+  "name": "ETH USDC 大额入所",
+  "conditions": {
+    "chains":        ["ethereum"],
+    "asset_symbols": ["USDC"],
+    "alert_types":   ["exchange_inflow"],
+    "min_usd":       500000
+  },
+  "webhook_id": "wh_xxxx"
+}
+```
+
+支持条件维度：链（chains）、资产类型（asset_symbols）、预警类型（alert_types）、金额范围（min_usd / max_usd）、特定地址监控（addresses）。规则独立绑定 Webhook，与全局 Webhook 互不干扰。
 
 **Webhook 示例：**
 
@@ -174,7 +194,57 @@ X-TokenSee-Signature: sha256=<hmac-sha256(body, secret)>
 
 ---
 
-### 📊 卖点 5：多链统一接口（7 条链）
+### 🧠 卖点 5：Smart Money 追踪
+
+**核心差异：** 知道"某笔大额转移"发生并不够，知道"Paradigm 刚把 ETH 从 Coinbase 提出来"才有 Alpha。TokenSee 维护一批经过人工研究整理的「聪明钱」地址库，将其大额链上行为实时呈现，相当于一个免费的 Nansen Smart Money 订阅源。
+
+**追踪的钱包类别：**
+
+| 类别 | 代表机构 |
+|---|---|
+| VC 基金 | Paradigm、a16z Crypto、Dragonfly Capital、Multicoin Capital、Polychain Capital |
+| 量化/做市商 | Jump Trading、Wintermute、Cumberland DRW |
+| 链上巨鲸 | 早期矿工持仓、大型 DeFi 参与者 |
+| DAO 国库 | Gitcoin Treasury、Uniswap DAO Treasury |
+
+**前端 Feed（`/smart-money` 页面）功能：**
+- 按类别筛选（VC / Quant / Market Maker / Whale / DAO）
+- 按链筛选（7 条链）
+- 展示：机构名称、角色（发送方/接收方）、资产+金额、交易对手方标签、交易类型、相对时间
+- 支持分页加载更多
+
+**API 接口：**
+
+```
+GET /v1/smart-money/activity?category=vc&chain=ethereum&limit=50
+→ 返回聪明钱最近大额转账记录（含机构名、角色、对手方标签）
+
+GET /v1/smart-money/wallets
+→ 返回所有追踪的钱包列表（含地址、名称、类别、标签）
+```
+
+---
+
+### 🗺️ 卖点 6：资金流图谱可视化
+
+**核心差异：** 调查一个地址时，知道"它转了多少钱"不如知道"它和谁有往来，资金怎么流动"。TokenSee 基于历史 whale_alerts 数据，自动构建地址的一跳资金流关系图，并在前端用纯 SVG + spring-force 布局渲染。
+
+**后端：** `GET /v1/address/:addr/graph?chain=ethereum`
+- 查询该地址作为发送方或接收方的全部大额转账记录
+- 聚合为图结构：节点（地址+实体标签+交易次数+总体量）、边（方向+资产类型+体量+频次）
+- 并行 lookup 实体标注
+
+**前端（地址详情页 Fund Flow Tab）：**
+- 纯 SVG 渲染，无第三方图表库依赖
+- JS spring-force 布局（80 次迭代弹簧+斥力模拟）
+- 目标地址居中，counterparts 环状分布
+- 节点颜色按实体类型（exchange=蓝/bridge=紫/fund=橙等）
+- 边宽度正比于资金体量
+- Hover 显示详细信息面板（地址/实体名/交易次数/体量），点击跳转地址详情
+
+---
+
+### 📊 卖点 7：多链统一接口（7 条链）
 
 **一套 API，七条链（ETH + BSC + ARB + POLYGON + BASE + OP + AVAX），无缝扩展。**
 
@@ -205,7 +275,7 @@ X-TokenSee-Signature: sha256=<hmac-sha256(body, secret)>
 
 ---
 
-### ⚡ 卖点 6：性能优先的缓存设计
+### ⚡ 卖点 8：性能优先的缓存设计
 
 | 场景 | 响应时间目标 |
 |---|---|
@@ -224,22 +294,26 @@ X-TokenSee-Signature: sha256=<hmac-sha256(body, secret)>
 
 ## 四、竞品对比
 
-| 维度 | Etherscan API | Alchemy | Moralis | **TokenSee** |
-|---|---|---|---|---|
-| 原始交易数据 | ✓ | ✓ | ✓ | ✓ |
-| 语义化摘要（自然语言） | ✗ | ✗ | 部分 | ✓ |
-| 资产流向（含 USD） | ✗ | ✗ | 部分 | ✓ |
-| 内部转账追踪 | ✗ | 部分（付费） | ✗ | ✓ |
-| 历史价格查询 | ✗ | ✗ | 部分 | ✓ |
-| 地址实体标注 | 部分（Etherscan 标签） | ✗ | ✗ | ✓ |
-| 机构钱包聚类查询 | ✗ | ✗ | ✗ | ✓ |
-| 实时巨鲸预警（SSE 推送） | ✗ | ✗ | ✗ | ✓ |
-| Webhook 主动推送 | ✗ | 部分 | 部分 | ✓ |
-| MEV 行为识别 | ✗ | ✗ | ✗ | ✓ |
-| 链上活动统计 Dashboard | ✗ | 部分 | 部分 | ✓ |
-| 多链统一 API（7 条链） | 分链独立 | 部分 | ✓ | ✓ |
-| 自托管/私有部署 | ✗ | ✗ | ✗ | ✓ |
-| 开源可扩展 | ✗ | ✗ | ✗ | ✓ |
+| 维度 | Etherscan API | Alchemy | Moralis | Nansen | **TokenSee** |
+|---|---|---|---|---|---|
+| 原始交易数据 | ✓ | ✓ | ✓ | ✓ | ✓ |
+| 语义化摘要（自然语言） | ✗ | ✗ | 部分 | ✗ | ✓ |
+| 资产流向（含 USD） | ✗ | ✗ | 部分 | ✓ | ✓ |
+| 内部转账追踪 | ✗ | 部分（付费） | ✗ | ✗ | ✓ |
+| 历史价格查询 | ✗ | ✗ | 部分 | ✓ | ✓ |
+| 地址实体标注 | 部分（标签） | ✗ | ✗ | ✓ | ✓ |
+| 机构钱包聚类查询 | ✗ | ✗ | ✗ | 部分 | ✓ |
+| Smart Money 追踪 | ✗ | ✗ | ✗ | ✓（付费） | ✓（免费） |
+| 资金流图谱可视化 | ✗ | ✗ | ✗ | 付费 | ✓ |
+| 实时巨鲸预警（SSE 推送） | ✗ | ✗ | ✗ | 付费 | ✓ |
+| Webhook 主动推送 | ✗ | 部分 | 部分 | 付费 | ✓ |
+| 自定义告警规则引擎 | ✗ | ✗ | ✗ | 付费 | ✓ |
+| MEV 行为识别 | ✗ | ✗ | ✗ | 部分 | ✓ |
+| 链上活动统计 Dashboard | ✗ | 部分 | 部分 | ✓ | ✓ |
+| **交互式 API Playground** | ✗ | ✓ | ✓ | ✗ | ✓ |
+| 多链统一 API（7 条链） | 分链独立 | 部分 | ✓ | 部分 | ✓ |
+| 自托管/私有部署 | ✗ | ✗ | ✗ | ✗ | ✓ |
+| 开源可扩展 | ✗ | ✗ | ✗ | ✗ | ✓ |
 
 ---
 
@@ -248,11 +322,11 @@ X-TokenSee-Signature: sha256=<hmac-sha256(body, secret)>
 1. **三层 ABI 解码 + 内部转账追踪**
    本地 ABI → 4byte.directory → 事件日志推断，覆盖率远超单一方案。对于长尾未知协议，也能从日志中恢复资产流向。此外，通过 `debug_traceTransaction` callTracer 还原合约内部 ETH 转移，解决闪电贷、多跳路由等场景下资产方向不可见的问题。
 
-2. **地址实体图谱 + 机构钱包聚类**
-   纯静态 Map 实现零延迟查询，与 Redis + PostgreSQL 三层结构结合，兼顾速度与可扩展性。ENS 正向/反向解析内置验证，防止伪造反向记录。`GET /v1/entity/:name/wallets` 支持按机构名批量拉取旗下全部已知钱包，覆盖 CEX、基金、协议多类实体。
+2. **地址实体图谱 + 机构钱包聚类 + Smart Money**
+   纯静态 Map 实现零延迟查询，与 Redis + PostgreSQL 三层结构结合，兼顾速度与可扩展性。ENS 正向/反向解析内置验证，防止伪造反向记录。`GET /v1/entity/:name/wallets` 支持按机构名批量拉取旗下全部已知钱包，覆盖 CEX、基金、协议多类实体。Smart Money 模块人工策展 14 个顶级 VC/做市商/巨鲸地址，将机构动向转化为结构化 Feed，替代价格高昂的 Nansen 订阅。
 
-3. **主动监控 + 多通道实时推送**
-   绝大多数区块链 API 是被动响应查询，TokenSee 的 WhaleMonitor 主动扫描 7 条链的新区块，实时分类预警写入数据库。推送通道双轨并行：SSE 持久连接（前端实时大屏）+ Webhook HTTP POST（后端系统集成），HMAC-SHA256 签名验证保障安全，自动重试保障可靠性。
+3. **主动监控 + 自定义规则引擎 + 多通道实时推送**
+   绝大多数区块链 API 是被动响应查询，TokenSee 的 WhaleMonitor 主动扫描 7 条链的新区块，实时分类预警写入数据库。自定义告警规则引擎（AlertRulesService）在每次预警写入后同步评估所有激活规则，匹配则定向推送到规则绑定的 Webhook，支持链/资产/类型/金额/地址五维过滤，无需用户写任何代码。推送通道双轨并行：SSE 持久连接（前端实时大屏）+ Webhook HTTP POST（后端系统集成）。
 
 4. **协议级语义理解（可扩展框架）**
    每个 DeFi 协议有独立的 Handler（实现 `canHandle()` + `buildSemantic()`），新协议接入只需添加 Handler 和注册合约地址，不影响其他逻辑。已支持：Uniswap V2/V3/Universal、Aave V3、Curve Finance、Compound V3、PancakeSwap V2/V3、QuickSwap V2、Aerodrome、**GMX V1+V2**（永续合约）、**Pendle**（收益代币化）、**EigenLayer**（再质押）。
@@ -260,7 +334,10 @@ X-TokenSee-Signature: sha256=<hmac-sha256(body, secret)>
 5. **MEV 识别流水线步骤（MevDetectStep）**
    作为解码流水线最后一步，无 RPC 调用、纯内存分析，不增加响应延迟。通过函数名模式（flashloan）、资产流向循环分析（arbitrage）、已知机器人地址匹配（sandwich_bot）三路并行检测，结果写入 `mev_type` 字段。新增检测规则只需扩展 `MevDetector.ts`，零改动流水线主体。
 
-6. **多链统一抽象层（7 链）**
+6. **资金流图谱（零依赖 SVG 渲染）**
+   后端聚合 whale_alerts 为图结构（节点+边），并行 lookup 实体标签；前端纯 JS spring-force 模拟（无 D3 / ECharts 等依赖），80 次弹簧+斥力迭代收敛，渲染性能好、包体积无增量。图谱嵌入地址详情页 Fund Flow Tab，与 Portfolio/Activity 三 Tab 无缝切换。
+
+7. **多链统一抽象层（7 链）**
    `EvmAdapter` + `RpcManager` + `KNOWN_ADDRESSES` 三层设计将链差异完全屏蔽。添加新链只需：① 在 viem/chains 中引入链对象 ② 配置 RPC URL ③ 注册协议地址——无需修改任何业务逻辑。Solana 等非 EVM 链通过替换 Adapter 层即可接入。
 
 ---
@@ -274,9 +351,14 @@ X-TokenSee-Signature: sha256=<hmac-sha256(body, secret)>
 | `/v1/account/:addr/activity` | GET | 地址历史交易记录，游标分页 |
 | `/v1/address/:addr/entity` | GET | 地址实体标签查询（ENS + 机构标签） |
 | `/v1/address/:addr/ens` | GET | ENS 反向解析 |
+| `/v1/address/:addr/graph` | GET | **资金流图谱**：一跳转账关系图（节点+边+体量） |
 | `/v1/entity/:name/wallets` | GET | **机构钱包聚类**：返回某机构旗下全部已知地址 |
+| `/v1/smart-money/activity` | GET | **Smart Money 动向**：VC/做市商/巨鲸最近大额转账 |
+| `/v1/smart-money/wallets` | GET | Smart Money 追踪钱包列表 |
 | `/v1/alerts` | GET | 历史巨鲸预警列表，支持链/类型/金额过滤 |
 | `/v1/alerts/stream` | GET | **SSE 实时流**，持久连接，新预警即时推送 |
+| `/v1/alert-rules` | GET/POST | **自定义告警规则**：CRUD 管理，多维条件过滤 |
+| `/v1/alert-rules/:id` | PATCH/DELETE | 启用/禁用/删除规则 |
 | `/v1/price/current` | GET | 批量查询当前代币 USD 价格 |
 | `/v1/price/history` | GET | 按 Unix 时间戳查询历史日级价格 |
 | `/v1/webhooks` | POST | 注册 Webhook URL（返回一次性密钥） |
@@ -323,14 +405,19 @@ X-TokenSee-Signature: sha256=<hmac-sha256(body, secret)>
 - [x] **链上统计 API**：`GET /v1/stats?window=1h|24h|7d`，聚合预警量、总体量、链/类型/资产分布
 - [x] **Dashboard 页面**：可视化展示 7 链活跃度、预警类型分布、Top 10 资产排行（纯 CSS 条形图）
 - [x] **Webhook 管理 UI**：前端支持注册/查看/删除 Webhook，Secret 一次性展示 + 验签代码示例
-- [x] **地址详情页完善**：Portfolio + Activity 双 Tab，Activity 支持按链过滤、游标加载更多
+- [x] **地址详情页完善**：Portfolio + Activity + Fund Flow 三 Tab，Activity 支持按链过滤、游标加载更多
 - [x] **CORS 跨域支持**：Express 中间件支持前后端分离部署，`FRONTEND_URL` 环境变量可配置
-- [x] **RPC 容错升级**：Avalanche 自动跳过 Alchemy（免费 Key 不支持），改用公共 RPC；ARB/BASE/OP/POLYGON fallback 改为 LlamaRPC（更稳定）；WhaleMonitor 启动时错峰调度，避免并发 429
+- [x] **RPC 容错升级**：Avalanche 自动跳过 Alchemy（免费 Key 不支持），ARB/BASE/OP/POLYGON fallback 改为 LlamaRPC；WhaleMonitor 启动错峰调度
+
+### ✅ 产品核心 & 数据深度（已完成）
+- [x] **API Playground**：`/docs` 页面内嵌交互式调试组件，支持 tx/decode、portfolio、alerts 三个接口实时调用，零跳转即可试用
+- [x] **Smart Money 追踪**：策展 14 个 VC/做市商/巨鲸钱包，`GET /v1/smart-money/activity` + 前端 Feed（按类别/链过滤），平替 Nansen Smart Money 付费功能
+- [x] **自定义告警规则引擎**：`POST /v1/alert-rules` 创建规则，支持链/资产/类型/金额/地址五维条件，每条规则独立绑定 Webhook，AlertRulesService 在 WhaleMonitor 每次写入后同步评估；前端 AlertRulesManager 组件可视化管理
+- [x] **资金流图谱可视化**：`GET /v1/address/:addr/graph` 聚合 whale_alerts 为图数据；前端 FundFlowGraph 纯 SVG + JS spring-force 渲染（无外部依赖），嵌入地址详情页 Fund Flow Tab
 
 ### 🔭 长期规划
 - [ ] SaaS 版本（托管服务 + 按量计费 API Key）
 - [ ] 机构数据订阅（全量实体图谱 + 历史预警数据导出）
-- [ ] 自定义规则引擎（用户自定义预警条件，无需写代码）
 - [ ] AI 分析层：自然语言描述链上地址行为画像
 - [ ] Solana 支持（SVM 解码器，独立 Adapter 层）
-- [ ] 链上图谱可视化（地址关系图，追踪资金流路径）
+- [ ] 图谱多跳扩展（当前 depth=1，扩展到 2-3 跳追踪洗钱/混币路径）
