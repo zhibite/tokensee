@@ -23,8 +23,10 @@ export function NavBar() {
             Alerts
           </Link>
           <Link href="/dashboard" className="hover:text-zinc-300 transition-colors">Dashboard</Link>
+          <Link href="/smart-money" className="hover:text-zinc-300 transition-colors">Smart Money</Link>
           <Link href="/entity" className="hover:text-zinc-300 transition-colors">Entities</Link>
           <Link href="/webhooks" className="hover:text-zinc-300 transition-colors">Webhooks</Link>
+          <Link href="/alert-rules" className="hover:text-zinc-300 transition-colors">Rules</Link>
           <Link href="/docs" className="hover:text-zinc-300 transition-colors">Docs</Link>
           <a
             href="https://github.com"

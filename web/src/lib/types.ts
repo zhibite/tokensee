@@ -197,6 +197,105 @@ export interface WebhooksListResponse {
 export type WebhookResult = WebhookCreateResponse | DecodeError;
 export type WebhooksListResult = WebhooksListResponse | DecodeError;
 
+// Smart Money types
+export type SmartMoneyCategory = 'vc' | 'quant' | 'market_maker' | 'whale' | 'dao_treasury';
+
+export interface SmartMoneyWallet {
+  address: string;
+  name: string;
+  category: SmartMoneyCategory;
+  tags: string[];
+}
+
+export interface SmartMoneyMove {
+  id: string;
+  wallet_address: string;
+  wallet_name: string;
+  wallet_category: SmartMoneyCategory;
+  role: 'sender' | 'receiver';
+  tx_hash: string;
+  chain: SupportedChain;
+  timestamp: number;
+  asset_symbol: string;
+  amount: string;
+  amount_usd: number | null;
+  alert_type: string;
+  counterpart_address: string;
+  counterpart_label: string | null;
+  counterpart_entity: string | null;
+  created_at: string;
+}
+
+export interface SmartMoneyActivityResponse {
+  success: true;
+  data: {
+    moves: SmartMoneyMove[];
+    total: number;
+    has_more: boolean;
+    cursor: string | null;
+  };
+}
+export type SmartMoneyActivityResult = SmartMoneyActivityResponse | DecodeError;
+
+// Alert Rules types
+export interface AlertRuleConditions {
+  chains?: string[];
+  asset_symbols?: string[];
+  alert_types?: string[];
+  addresses?: string[];
+  min_usd?: number;
+  max_usd?: number;
+}
+
+export interface AlertRule {
+  id: string;
+  name: string;
+  description: string | null;
+  conditions: AlertRuleConditions;
+  webhook_id: string | null;
+  active: boolean;
+  triggered_count: number;
+  last_triggered_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface AlertRulesResponse { success: true; data: { items: AlertRule[] } }
+export type AlertRulesResult = AlertRulesResponse | DecodeError;
+
+// Graph types
+export interface GraphNode {
+  id: string;
+  address: string;
+  label: string | null;
+  entity_name: string | null;
+  entity_type: string | null;
+  is_center: boolean;
+  tx_count: number;
+  volume_usd: number;
+}
+
+export interface GraphEdge {
+  id: string;
+  source: string;
+  target: string;
+  asset_symbol: string;
+  volume_usd: number;
+  tx_count: number;
+}
+
+export interface GraphData {
+  center: string;
+  chain: string;
+  nodes: GraphNode[];
+  edges: GraphEdge[];
+  total_volume_usd: number;
+  total_tx_count: number;
+}
+
+export interface GraphResponse { success: true; data: GraphData }
+export type GraphResult = GraphResponse | DecodeError;
+
 // Stats types
 export interface ChainStat  { chain: string;  count: number; volume_usd: number }
 export interface TypeStat   { type: string;   count: number; volume_usd: number }

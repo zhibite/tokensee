@@ -8,6 +8,9 @@ import { priceRoutes } from './routes/price.routes.js';
 import { webhookRoutes } from './routes/webhook.routes.js';
 import { entityRoutes } from './routes/entity.routes.js';
 import { statsRoutes } from './routes/stats.routes.js';
+import { smartMoneyRoutes } from './routes/smartmoney.routes.js';
+import { alertRulesRoutes } from './routes/alertrules.routes.js';
+import { graphRoutes } from './routes/graph.routes.js';
 import { apiKeyMiddleware } from './middleware/apiKey.js';
 import type { ApiError } from '../types/transaction.types.js';
 
@@ -60,6 +63,9 @@ export function createServer(): express.Application {
   app.use('/v1/stats', statsRoutes);
   app.use('/v1/webhooks', webhookRoutes);
   app.use('/v1/entity', entityRoutes);
+  app.use('/v1/smart-money', smartMoneyRoutes);
+  app.use('/v1/alert-rules', alertRulesRoutes);
+  app.use('/v1/address', graphRoutes);
 
   // 404 handler
   app.use((_req: Request, res: Response) => {

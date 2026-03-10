@@ -12,6 +12,7 @@ import { rpcManager } from '../rpc/RpcManager.js';
 import { entityService } from '../entity/EntityService.js';
 import { priceService } from '../price/PriceService.js';
 import { webhookService } from '../webhook/WebhookService.js';
+import { alertRulesService } from '../alertrules/AlertRulesService.js';
 import { db } from '../db/Database.js';
 
 /** Emits 'alert' events with a WhaleAlert payload — consumed by SSE endpoint */
@@ -406,8 +407,9 @@ export class WhaleMonitor {
           created_at: row.created_at,
         };
         whaleAlertEmitter.emit('alert', payload);
-        // Webhook dispatch is non-blocking
+        // Webhook dispatch + alert rules evaluation (both non-blocking)
         webhookService.dispatch(payload).catch(() => {});
+        alertRulesService.evaluateAll(payload).catch(() => {});
       }
     } catch {
       // Duplicate or DB unavailable — ignore

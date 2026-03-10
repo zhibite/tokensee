@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { NavBar } from '@/components/NavBar';
+import { ApiPlayground } from '@/components/ApiPlayground';
 
 export const metadata: Metadata = {
   title: 'API Reference · TokenSee',
@@ -208,6 +209,20 @@ X-Api-Key: tsk_live_xxxxxxxxxxxxxxxxxxxx`}</CodeBlock>
             </Section>
           </div>
 
+            <ApiPlayground config={{
+              method: 'POST',
+              pathTpl: '/v1/tx/decode',
+              bodyMode: true,
+              fields: [
+                { key: 'hash', label: 'Transaction Hash', type: 'text',
+                  placeholder: '0x3ca204e45e3801a...',
+                  default: '0x3ca204e45e3801a19cd0217b70fdd33eb0af6cf3e7310878f19ee216e5ff329e' },
+                { key: 'chain', label: 'Chain', type: 'select',
+                  options: ['ethereum', 'bsc', 'arbitrum', 'polygon', 'base', 'optimism', 'avalanche'],
+                  default: 'ethereum' },
+              ],
+            }} />
+
           {/* ── GET /v1/account/:address/portfolio ── */}
           <div id="portfolio">
             <EndpointHeader method="GET" path="/v1/account/:address/portfolio" />
@@ -288,6 +303,18 @@ X-Api-Key: tsk_live_xxxxxxxxxxxxxxxxxxxx`}</CodeBlock>
             </Section>
           </div>
 
+            <ApiPlayground config={{
+              method: 'GET',
+              pathTpl: '/v1/account/:address/portfolio',
+              bodyMode: false,
+              fields: [
+                { key: 'address', label: 'Wallet Address', type: 'text',
+                  placeholder: '0x1a2b3c...', default: '0x47ac0fb4f2d84898e4d9e7b4dab3c24507a6d503' },
+                { key: 'chains', label: 'Chains (comma-separated)', type: 'text',
+                  placeholder: 'ethereum,bsc', default: 'ethereum' },
+              ],
+            }} />
+
           {/* ── GET /v1/account/:address/activity ── */}
           <div id="activity">
             <EndpointHeader method="GET" path="/v1/account/:address/activity" badge="Coming Soon" />
@@ -319,6 +346,18 @@ X-Api-Key: tsk_live_xxxxxxxxxxxxxxxxxxxx`}</CodeBlock>
 }`}</CodeBlock>
             </Section>
           </div>
+
+            <ApiPlayground config={{
+              method: 'GET',
+              pathTpl: '/v1/alerts',
+              bodyMode: false,
+              fields: [
+                { key: 'chain', label: 'Chain (optional)', type: 'select',
+                  options: ['', 'ethereum', 'bsc', 'arbitrum', 'polygon', 'base', 'optimism', 'avalanche'],
+                  default: '' },
+                { key: 'limit', label: 'Limit', type: 'text', placeholder: '20', default: '5' },
+              ],
+            }} />
 
           {/* ── Types ──────────────────────────────── */}
           <Section id="types" title="Data Types">

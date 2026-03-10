@@ -44,6 +44,21 @@ const TIMEOUT_MS  = 8_000;
 
 export class WebhookService {
   /**
+   * Dispatch to a specific webhook by ID (used by AlertRulesService).
+   */
+  async dispatchToWebhook(webhookId: string, alert: Record<string, unknown>): Promise<void> {
+    try {
+      const result = await db.query<WebhookRow>(
+        `SELECT id, url, secret, event_types, chains, min_usd FROM webhooks WHERE id = $1 AND active = TRUE`,
+        [webhookId]
+      );
+      if (result.rows[0]) {
+        await this.deliver(result.rows[0], alert as unknown as AlertPayload);
+      }
+    } catch { /* ignore */ }
+  }
+
+  /**
    * Called by WhaleMonitor after a new alert is persisted.
    * Runs async without blocking the monitor.
    */
