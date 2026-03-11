@@ -26,6 +26,7 @@ const envSchema = z.object({
   // External APIs
   COINGECKO_API_KEY: z.string().optional(),
   BSCSCAN_API_KEY: z.string().optional(),
+  ETHERSCAN_API_KEY: z.string().optional(),   // used by EnrichmentService
 
   // Auth
   API_KEY_SALT: z.string().min(16),

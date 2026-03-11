@@ -10,6 +10,7 @@ import { EventEmitter } from 'events';
 import { formatUnits, type Log } from 'viem';
 import { rpcManager } from '../rpc/RpcManager.js';
 import { entityService } from '../entity/EntityService.js';
+import { enrichmentService } from '../entity/EnrichmentService.js';
 import { priceService } from '../price/PriceService.js';
 import { webhookService } from '../webhook/WebhookService.js';
 import { alertRulesService } from '../alertrules/AlertRulesService.js';
@@ -136,6 +137,7 @@ export class WhaleMonitor {
   start(): void {
     if (this.running) return;
     this.running = true;
+    enrichmentService.start();
 
     // Stagger start times to avoid Alchemy rate-limit burst.
     // ETH uses dedicated Alchemy key → 30s. BSC uses public RPC → 15s.
@@ -167,6 +169,7 @@ export class WhaleMonitor {
     this.timers.forEach(clearInterval);
     this.timers = [];
     this.running = false;
+    enrichmentService.stop();
     console.log('[WhaleMonitor] Stopped');
   }
 
@@ -340,6 +343,10 @@ export class WhaleMonitor {
       entityService.lookup(from, chain),
       entityService.lookup(to, chain),
     ]);
+
+    // Auto-enrich unknown addresses in the background (P1)
+    if (!fromEntity) enrichmentService.enqueue(from, chain);
+    if (!toEntity)   enrichmentService.enqueue(to, chain);
 
     const alertType = this.classifyAlert(fromEntity?.entity_type, toEntity?.entity_type);
 

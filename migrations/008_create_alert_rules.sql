@@ -8,8 +8,8 @@ CREATE TABLE IF NOT EXISTS alert_rules (
   description      TEXT,
   -- conditions: { chains?, asset_symbols?, min_usd?, max_usd?, alert_types?, addresses? }
   conditions       JSONB NOT NULL DEFAULT '{}',
-  -- action: { webhook_id: UUID } — links to webhooks table
-  webhook_id       UUID REFERENCES webhooks(id) ON DELETE SET NULL,
+  -- action: { webhook_id } — links to webhooks table (bigint)
+  webhook_id       BIGINT REFERENCES webhooks(id) ON DELETE SET NULL,
   active           BOOLEAN NOT NULL DEFAULT true,
   triggered_count  INTEGER NOT NULL DEFAULT 0,
   last_triggered_at TIMESTAMPTZ,
