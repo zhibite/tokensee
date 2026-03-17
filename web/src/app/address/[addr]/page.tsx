@@ -3,7 +3,7 @@ import type { Metadata } from 'next';
 import { NavBar } from '@/components/NavBar';
 import { AddressHeader } from '@/components/AddressHeader';
 import { AddressTabs } from '@/components/AddressTabs';
-import { getPortfolio, getSocialProfile } from '@/lib/api';
+import { getPortfolio } from '@/lib/api';
 import { shortenAddress } from '@/lib/utils';
 
 interface Props {
@@ -28,18 +28,12 @@ export default async function AddressPage({ params, searchParams }: Props) {
 
   if (!ADDRESS_RE.test(addr)) notFound();
 
-  // Fetch portfolio and social profile in parallel
-  const [res, socialRes] = await Promise.all([
-    getPortfolio(addr, chains),
-    getSocialProfile(addr),
-  ]);
-
-  const socialProfile = socialRes.success ? socialRes.data : null;
+  const res = await getPortfolio(addr, chains);
 
   return (
     <div className="min-h-screen bg-zinc-950">
       <NavBar />
-      <main className="max-w-5xl mx-auto px-4 py-10">
+      <main className="max-w-2xl mx-auto px-4 py-10">
 
         {/* Breadcrumb */}
         <div className="flex items-center gap-2 text-xs text-zinc-600 mb-6">
@@ -50,13 +44,8 @@ export default async function AddressPage({ params, searchParams }: Props) {
 
         {res.success ? (
           <>
-            <AddressHeader
-              address={res.data.address}
-              totalUsd={res.data.total_value_usd}
-              ensName={res.data.ens_name ?? null}
-              socialProfile={socialProfile}
-            />
-            <AddressTabs portfolio={res.data} address={addr} socialProfile={socialProfile} />
+            <AddressHeader address={res.data.address} totalUsd={res.data.total_value_usd} ensName={res.data.ens_name ?? null} />
+            <AddressTabs portfolio={res.data} address={addr} />
           </>
         ) : (
           <div className="rounded-xl border border-red-900/40 bg-red-950/20 px-5 py-4">

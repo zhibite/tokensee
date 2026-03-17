@@ -18,35 +18,18 @@ const COINGECKO_ID_MAP: Record<string, string> = {
   UNI: 'uniswap',
   AAVE: 'aave',
   MATIC: 'matic-network',
-  WMATIC: 'matic-network',
-  AVAX: 'avalanche-2',
-  WAVAX: 'avalanche-2',
   ARB: 'arbitrum',
   OP: 'optimism',
-};
-
-// Stablecoins — always $1, no API call needed
-const STABLECOIN_PRICE: Record<string, number> = {
-  USDC: 1, USDT: 1, DAI: 1, BUSD: 1, FRAX: 1, LUSD: 1,
-  TUSD: 1, USDP: 1, GUSD: 1, USDD: 1, FDUSD: 1, PYUSD: 1,
-  SUSD: 1, DOLA: 1, USDB: 1, CRVUSD: 1, MKUSD: 1, EUSD: 1,
 };
 
 export class PriceService {
   async getPrice(symbol: string): Promise<number | null> {
     const upperSymbol = symbol.toUpperCase();
-
-    // Stablecoins: skip API entirely
-    if (STABLECOIN_PRICE[upperSymbol] !== undefined) return STABLECOIN_PRICE[upperSymbol];
-
     const cacheKey = CACHE_KEYS.tokenPrice(upperSymbol);
     const cached = await cache.get<number>(cacheKey);
     if (cached !== null) return cached;
 
-    // Try CoinGecko first, then DeFiLlama as fallback
-    let price = await this.fetchFromCoinGecko(upperSymbol);
-    if (price === null) price = await this.fetchFromDefiLlama(upperSymbol);
-
+    const price = await this.fetchFromCoinGecko(upperSymbol);
     if (price !== null) {
       await cache.set(cacheKey, price, TTL.TOKEN_PRICE);
     }
@@ -98,20 +81,6 @@ export class PriceService {
         await cache.set(cacheKey, price, TTL.TOKEN_METADATA);
       }
       return price;
-    } catch {
-      return null;
-    }
-  }
-
-  private async fetchFromDefiLlama(symbol: string): Promise<number | null> {
-    const id = COINGECKO_ID_MAP[symbol];
-    if (!id) return null;
-
-    try {
-      const res = await axios.get<{
-        coins: Record<string, { price?: number }>;
-      }>(`https://coins.llama.fi/prices/current/coingecko:${id}`, { timeout: 5_000 });
-      return res.data?.coins?.[`coingecko:${id}`]?.price ?? null;
     } catch {
       return null;
     }

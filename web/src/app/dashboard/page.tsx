@@ -187,12 +187,12 @@ export default async function DashboardPage({
   const { window: w = '24h' } = await searchParams;
   const validWindow = ['1h', '24h', '7d'].includes(w) ? (w as '1h' | '24h' | '7d') : '24h';
 
-  const res = await getStats(validWindow).catch(() => ({ success: false as const, data: null }));
+  const res = await getStats(validWindow);
 
   return (
     <div className="min-h-screen bg-zinc-950">
       <NavBar />
-      <main className="max-w-5xl mx-auto px-4 py-10">
+      <main className="max-w-4xl mx-auto px-4 py-10">
 
         {/* Header */}
         <div className="flex items-start justify-between gap-4 mb-8">
@@ -226,7 +226,7 @@ export default async function DashboardPage({
         ) : (
           <div className="rounded-xl border border-red-900/40 bg-red-950/20 px-5 py-4">
             <p className="text-red-400 text-sm font-semibold mb-1">Failed to load stats</p>
-            <p className="text-red-700 text-xs">{'error' in res ? res.error.message : 'Backend unavailable — make sure the server is running.'}</p>
+            <p className="text-red-700 text-xs">{res.error.message}</p>
             <p className="text-red-900 text-xs mt-2">
               Stats require whale alert data in the database. Start the WhaleMonitor and wait for events.
             </p>

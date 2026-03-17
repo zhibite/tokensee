@@ -1,6 +1,5 @@
 import { DecodeForm } from '@/components/DecodeForm';
 import { NavBar } from '@/components/NavBar';
-import { AddressSearchHero } from '@/components/AddressSearchHero';
 
 export default function Home() {
   return (
@@ -19,16 +18,11 @@ export default function Home() {
           <span className="text-zinc-400">as simple as a REST API</span>
         </h1>
 
-        <p className="text-zinc-500 text-base max-w-lg mx-auto mb-8 leading-relaxed">
+        <p className="text-zinc-500 text-base max-w-lg mx-auto mb-10 leading-relaxed">
           TokenSee is invisible infrastructure for blockchain data.
           Decode transactions, fetch portfolios, and stream activity —
           without touching a node or writing ABI parsers.
         </p>
-
-        {/* Address search — hero entry point */}
-        <div className="max-w-md mx-auto mb-8">
-          <AddressSearchHero />
-        </div>
 
         <div className="flex items-center justify-center gap-3 flex-wrap">
           <a

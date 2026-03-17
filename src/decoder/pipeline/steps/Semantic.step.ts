@@ -7,28 +7,12 @@ import { formatGwei, formatAmount, buildSwapSummary } from '../../semantic/forma
 import { NATIVE_TOKEN_ADDRESS } from '../../../config/chains.config.js';
 import { EthereumAdapter } from '../../../chains/ethereum/EthereumAdapter.js';
 import { BscAdapter } from '../../../chains/bsc/BscAdapter.js';
-import { EvmAdapter } from '../../../chains/evm/EvmAdapter.js';
 import type { IChainAdapter } from '../../../chains/base/ChainAdapter.interface.js';
 import type { SupportedChain } from '../../../types/chain.types.js';
 
 const adapterMap: Record<SupportedChain, IChainAdapter> = {
   ethereum: new EthereumAdapter(),
-  bsc:      new BscAdapter(),
-  arbitrum:  new EvmAdapter('arbitrum',  42161),
-  polygon:   new EvmAdapter('polygon',   137),
-  base:      new EvmAdapter('base',      8453),
-  optimism:  new EvmAdapter('optimism',  10),
-  avalanche: new EvmAdapter('avalanche', 43114),
-};
-
-const NATIVE_SYMBOL: Record<SupportedChain, string> = {
-  ethereum:  'ETH',
-  bsc:       'BNB',
-  arbitrum:  'ETH',
-  polygon:   'MATIC',
-  base:      'ETH',
-  optimism:  'ETH',
-  avalanche: 'AVAX',
+  bsc: new BscAdapter(),
 };
 
 export class SemanticStep implements PipelineStep {
@@ -87,7 +71,7 @@ export class SemanticStep implements PipelineStep {
     const gasPrice = raw.gasPrice;
     const feeWei = gasUsed * gasPrice;
     const feeEth = formatUnits(feeWei, 18);
-    const nativeSymbol = NATIVE_SYMBOL[raw.chain] ?? 'ETH';
+    const nativeSymbol = raw.chain === 'ethereum' ? 'ETH' : 'BNB';
     const nativePrice = await priceService.getPrice(nativeSymbol);
     const feeUsd = nativePrice !== null ? (parseFloat(feeEth) * nativePrice).toFixed(2) : null;
 

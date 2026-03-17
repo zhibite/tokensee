@@ -5,8 +5,7 @@ import { getAlerts } from '@/lib/api';
 import type { WhaleAlert, AlertType } from '@/lib/types';
 import { shortenAddress, formatTimestamp } from '@/lib/utils';
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? '';
-const API_V1 = API_BASE ? `${API_BASE}/v1` : '/api/v1';
+const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3000';
 
 const ALERT_TYPE_LABELS: Record<AlertType, string> = {
   large_transfer:    'Transfer',
@@ -77,22 +76,20 @@ export function AlertFeed() {
   const [connected, setConnected] = useState(false);
   const [chain, setChain] = useState('');
   const [type, setType] = useState('');
-  const [minUsd, setMinUsd] = useState(1_000_000);
+  const [minUsd, setMinUsd] = useState(100_000);
   const esRef = useRef<EventSource | null>(null);
   const stats = computeStats(alerts);
 
   // Initial load from REST (history)
   const load = useCallback(async () => {
-    try {
-      const res = await getAlerts({
-        chain: chain || undefined,
-        type: type || undefined,
-        min_usd: minUsd,
-        limit: 50,
-      });
-      if (res.success) setAlerts(res.data.items);
-    } catch { /* backend unavailable */ }
-    finally { setLoading(false); }
+    const res = await getAlerts({
+      chain: chain || undefined,
+      type: type || undefined,
+      min_usd: minUsd,
+      limit: 50,
+    });
+    if (res.success) setAlerts(res.data.items);
+    setLoading(false);
   }, [chain, type, minUsd]);
 
   useEffect(() => {
@@ -102,7 +99,7 @@ export function AlertFeed() {
 
   // SSE connection for real-time new alerts
   useEffect(() => {
-    const es = new EventSource(`${API_V1}/alerts/stream`);
+    const es = new EventSource(`${API_BASE}/v1/alerts/stream`);
     esRef.current = es;
 
     es.addEventListener('connected', () => setConnected(true));

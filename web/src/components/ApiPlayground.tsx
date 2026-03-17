@@ -18,7 +18,7 @@ interface PlaygroundConfig {
   bodyMode: boolean;        // true → fields go in JSON body, false → path/query params
 }
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? '';
+const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3000';
 
 // Build URL and body from field values
 function buildRequest(cfg: PlaygroundConfig, vals: Record<string, string>) {
@@ -43,8 +43,7 @@ function buildRequest(cfg: PlaygroundConfig, vals: Record<string, string>) {
     ? '?' + new URLSearchParams(qs).toString()
     : '';
 
-  const prefix = API_BASE ? API_BASE : '/api';
-  return { url: `${prefix}${path}${qStr}`, body: cfg.bodyMode ? body : null };
+  return { url: `${API_BASE}${path}${qStr}`, body: cfg.bodyMode ? body : null };
 }
 
 export function ApiPlayground({ config }: { config: PlaygroundConfig }) {

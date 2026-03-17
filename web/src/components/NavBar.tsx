@@ -1,162 +1,10 @@
-'use client';
-
 import Link from 'next/link';
-import { useState, useRef, useEffect, type KeyboardEvent } from 'react';
-import { useRouter, usePathname } from 'next/navigation';
-
-const ADDRESS_RE = /^0x[0-9a-fA-F]{40}$/;
-
-function AddressSearch() {
-  const [value, setValue]   = useState('');
-  const [error, setError]   = useState(false);
-  const inputRef            = useRef<HTMLInputElement>(null);
-  const router              = useRouter();
-
-  const go = () => {
-    const v = value.trim();
-    if (!ADDRESS_RE.test(v)) { setError(true); return; }
-    setError(false);
-    setValue('');
-    router.push(`/address/${v.toLowerCase()}`);
-  };
-
-  const onKey = (e: KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter') go();
-    if (error) setError(false);
-  };
-
-  return (
-    <div className="relative flex items-center">
-      <svg
-        width="13" height="13" viewBox="0 0 16 16" fill="none"
-        className="absolute left-2.5 text-zinc-600 pointer-events-none"
-      >
-        <circle cx="6.5" cy="6.5" r="4.5" stroke="currentColor" strokeWidth="1.4"/>
-        <path d="M10 10l3 3" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/>
-      </svg>
-      <input
-        ref={inputRef}
-        value={value}
-        onChange={(e) => { setValue(e.target.value); setError(false); }}
-        onKeyDown={onKey}
-        placeholder="0x address…"
-        spellCheck={false}
-        className={`pl-7 pr-2 py-1 w-36 focus:w-52 transition-all duration-200 rounded-md text-xs font-mono
-          bg-zinc-900 border ${error ? 'border-red-700' : 'border-zinc-700'}
-          text-zinc-300 placeholder-zinc-600
-          focus:outline-none focus:border-zinc-500`}
-      />
-      {value && (
-        <button
-          onClick={go}
-          className="absolute right-1.5 text-zinc-500 hover:text-zinc-300 transition-colors"
-          title="Go to address"
-        >
-          <svg width="12" height="12" viewBox="0 0 16 16" fill="none">
-            <path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-          </svg>
-        </button>
-      )}
-    </div>
-  );
-}
-
-interface DropdownItem {
-  href: string;
-  label: string;
-  description?: string;
-  badge?: string;
-  dot?: string; // color class for live dot
-}
-
-interface NavDropdownProps {
-  label: string;
-  items: DropdownItem[];
-  activePaths?: string[];
-}
-
-function NavDropdown({ label, items, activePaths = [] }: NavDropdownProps) {
-  const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
-  const pathname = usePathname();
-
-  const isActive = activePaths.some(p => pathname.startsWith(p));
-
-  useEffect(() => {
-    const handler = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
-    };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
-  }, []);
-
-  return (
-    <div ref={ref} className="relative">
-      <button
-        onClick={() => setOpen(o => !o)}
-        className={`flex items-center gap-1 text-sm transition-colors ${
-          isActive ? 'text-zinc-200' : 'text-zinc-500 hover:text-zinc-300'
-        }`}
-      >
-        {label}
-        <svg
-          width="10" height="10" viewBox="0 0 10 10" fill="none"
-          className={`transition-transform duration-150 ${open ? 'rotate-180' : ''}`}
-        >
-          <path d="M2 3.5l3 3 3-3" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/>
-        </svg>
-      </button>
-
-      {open && (
-        <div className="absolute top-full right-0 mt-2 w-52 rounded-lg border border-zinc-800 bg-zinc-950 shadow-xl py-1 z-50">
-          {items.map((item) => (
-            <Link
-              key={item.href}
-              href={item.href}
-              onClick={() => setOpen(false)}
-              className={`flex items-start gap-3 px-3 py-2.5 hover:bg-zinc-900 transition-colors group ${
-                pathname === item.href ? 'bg-zinc-900/60' : ''
-              }`}
-            >
-              {item.dot && (
-                <span className={`mt-1 w-1.5 h-1.5 rounded-full shrink-0 ${item.dot}`} />
-              )}
-              <div className="min-w-0">
-                <div className="flex items-center gap-2">
-                  <span className={`text-xs font-medium ${
-                    pathname === item.href ? 'text-zinc-200' : 'text-zinc-400 group-hover:text-zinc-200'
-                  } transition-colors`}>
-                    {item.label}
-                  </span>
-                  {item.badge && (
-                    <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-zinc-800 text-zinc-500 font-medium">
-                      {item.badge}
-                    </span>
-                  )}
-                </div>
-                {item.description && (
-                  <p className="text-[11px] text-zinc-600 mt-0.5 leading-tight">{item.description}</p>
-                )}
-              </div>
-            </Link>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
 
 export function NavBar() {
-  const pathname = usePathname();
-
-  const isActive = (href: string) => pathname === href;
-
   return (
     <nav className="border-b border-zinc-800/60 px-4 py-3">
-      <div className="max-w-5xl mx-auto flex items-center justify-between gap-4">
-
-        {/* Logo */}
-        <Link href="/" className="flex items-center gap-2 group shrink-0">
+      <div className="max-w-5xl mx-auto flex items-center justify-between">
+        <Link href="/" className="flex items-center gap-2 group">
           <div className="w-6 h-6 rounded-md bg-white flex items-center justify-center">
             <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
               <circle cx="8" cy="8" r="3" fill="#09090b" />
@@ -168,87 +16,18 @@ export function NavBar() {
           </span>
         </Link>
 
-        {/* Address search */}
-        <AddressSearch />
-
-        {/* Nav links */}
         <div className="flex items-center gap-5 text-sm text-zinc-500">
-
-          <Link
-            href="/"
-            className={`hover:text-zinc-300 transition-colors ${isActive('/') ? 'text-zinc-200' : ''}`}
-          >
-            Decode
+          <Link href="/" className="hover:text-zinc-300 transition-colors">Decode</Link>
+          <Link href="/alerts" className="hover:text-zinc-300 transition-colors flex items-center gap-1.5">
+            <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
+            Alerts
           </Link>
-
-          {/* Monitor dropdown */}
-          <NavDropdown
-            label="Monitor"
-            activePaths={['/intelligence', '/alerts', '/security', '/flow']}
-            items={[
-              {
-                href: '/intelligence',
-                label: 'Intelligence',
-                description: 'Classified event feed with narratives',
-                dot: 'bg-green-500 animate-pulse',
-              },
-              {
-                href: '/alerts',
-                label: 'Whale Alerts',
-                description: 'Raw large transfers ≥$100k',
-              },
-              {
-                href: '/security',
-                label: 'Security Wall',
-                description: 'Hackers, sanctioned & mixer activity',
-                badge: 'new',
-              },
-              {
-                href: '/flow',
-                label: 'Fund Flow',
-                description: 'Visualize capital between entities',
-                badge: 'new',
-              },
-            ]}
-          />
-
-          <Link
-            href="/smart-money"
-            className={`hover:text-zinc-300 transition-colors ${isActive('/smart-money') ? 'text-zinc-200' : ''}`}
-          >
-            Smart Money
-          </Link>
-
-          <Link
-            href="/entity"
-            className={`hover:text-zinc-300 transition-colors ${isActive('/entity') ? 'text-zinc-200' : ''}`}
-          >
-            Entities
-          </Link>
-
-          {/* Dev tools dropdown */}
-          <NavDropdown
-            label="Dev"
-            activePaths={['/alert-rules', '/webhooks', '/docs']}
-            items={[
-              {
-                href: '/alert-rules',
-                label: 'Alert Rules',
-                description: 'Custom event subscriptions',
-              },
-              {
-                href: '/webhooks',
-                label: 'Webhooks',
-                description: 'Push delivery configuration',
-              },
-              {
-                href: '/docs',
-                label: 'API Docs',
-                description: 'REST API reference',
-              },
-            ]}
-          />
-
+          <Link href="/dashboard" className="hover:text-zinc-300 transition-colors">Dashboard</Link>
+          <Link href="/smart-money" className="hover:text-zinc-300 transition-colors">Smart Money</Link>
+          <Link href="/entity" className="hover:text-zinc-300 transition-colors">Entities</Link>
+          <Link href="/webhooks" className="hover:text-zinc-300 transition-colors">Webhooks</Link>
+          <Link href="/alert-rules" className="hover:text-zinc-300 transition-colors">Rules</Link>
+          <Link href="/docs" className="hover:text-zinc-300 transition-colors">Docs</Link>
           <a
             href="https://github.com"
             target="_blank"

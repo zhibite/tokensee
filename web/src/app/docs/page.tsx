@@ -58,7 +58,7 @@ export default function DocsPage() {
             <CodeBlock lang="text">{`https://api.tokensee.com`}</CodeBlock>
             <p className="text-zinc-500 text-xs mt-3">
               All endpoints are versioned under <code className="inline-code">/v1</code>.
-              Development: <code className="inline-code">http://localhost:6000/v1</code>
+              Development: <code className="inline-code">http://localhost:3000/v1</code>
             </p>
           </Section>
 

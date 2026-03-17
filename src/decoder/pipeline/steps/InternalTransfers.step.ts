@@ -17,13 +17,10 @@ import { priceService } from '../../../services/price/PriceService.js';
 import type { PipelineStep, PipelineContext } from '../../../types/pipeline.types.js';
 import type { AssetAmount } from '../../../types/transaction.types.js';
 
-// Chains where Alchemy supports debug_traceTransaction for internal native transfer enrichment.
-// Avalanche excluded: Alchemy free tier doesn't support AVAX debug namespace.
 const NATIVE_SYMBOL: Record<string, string> = {
   ethereum: 'ETH',
   arbitrum: 'ETH',
   base:     'ETH',
-  optimism: 'ETH',
   polygon:  'MATIC',
 };
 

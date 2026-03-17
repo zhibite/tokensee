@@ -11,7 +11,6 @@ import { formatUnits, type Log } from 'viem';
 import { rpcManager } from '../rpc/RpcManager.js';
 import { entityService } from '../entity/EntityService.js';
 import { enrichmentService } from '../entity/EnrichmentService.js';
-import { clusteringService } from '../entity/ClusteringService.js';
 import { priceService } from '../price/PriceService.js';
 import { webhookService } from '../webhook/WebhookService.js';
 import { alertRulesService } from '../alertrules/AlertRulesService.js';
@@ -33,8 +32,8 @@ import {
 } from '../../config/chains.config.js';
 import type { SupportedChain } from '../../types/chain.types.js';
 
-// USD threshold to qualify as a "whale" alert — configurable via WHALE_USD_THRESHOLD env
-const USD_THRESHOLD = parseInt(process.env.WHALE_USD_THRESHOLD ?? '1000000', 10);
+// USD threshold to qualify as a "whale" alert
+const USD_THRESHOLD = 100_000;
 
 // Tokens to track (address → { symbol, decimals })
 const TRACKED_TOKENS: Record<string, Record<string, { symbol: string; decimals: number }>> = {
@@ -139,7 +138,6 @@ export class WhaleMonitor {
     if (this.running) return;
     this.running = true;
     enrichmentService.start();
-    clusteringService.start();
 
     // Stagger start times to avoid Alchemy rate-limit burst.
     // ETH uses dedicated Alchemy key → 30s. BSC uses public RPC → 15s.
@@ -172,7 +170,6 @@ export class WhaleMonitor {
     this.timers = [];
     this.running = false;
     enrichmentService.stop();
-    clusteringService.stop();
     console.log('[WhaleMonitor] Stopped');
   }
 

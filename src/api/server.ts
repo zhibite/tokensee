@@ -11,10 +11,6 @@ import { statsRoutes } from './routes/stats.routes.js';
 import { smartMoneyRoutes } from './routes/smartmoney.routes.js';
 import { alertRulesRoutes } from './routes/alertrules.routes.js';
 import { graphRoutes } from './routes/graph.routes.js';
-import { socialRoutes } from './routes/social.routes.js';
-import { intelligenceRoutes } from './routes/intelligence.routes.js';
-import { securityRoutes } from './routes/security.routes.js';
-import { flowRoutes } from './routes/flow.routes.js';
 import { apiKeyMiddleware } from './middleware/apiKey.js';
 import type { ApiError } from '../types/transaction.types.js';
 
@@ -24,8 +20,8 @@ export function createServer(): express.Application {
   // CORS — allow frontend dev server and any configured origin
   app.use((req: Request, res: Response, next: NextFunction) => {
     const allowed = [
-      'http://localhost:6001',
-      'http://localhost:6000',
+      'http://localhost:3001',
+      'http://localhost:3000',
       process.env.FRONTEND_URL,
     ].filter(Boolean);
 
@@ -70,10 +66,6 @@ export function createServer(): express.Application {
   app.use('/v1/smart-money', smartMoneyRoutes);
   app.use('/v1/alert-rules', alertRulesRoutes);
   app.use('/v1/address', graphRoutes);
-  app.use('/v1/address', socialRoutes);
-  app.use('/v1/intelligence', intelligenceRoutes);
-  app.use('/v1/security', securityRoutes);
-  app.use('/v1/flow', flowRoutes);
 
   // 404 handler
   app.use((_req: Request, res: Response) => {

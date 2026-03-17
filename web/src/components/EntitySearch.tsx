@@ -40,19 +40,14 @@ export function EntitySearch() {
     setError(null);
     setResult(null);
 
-    try {
-      const res = await getEntityWallets(trimmed);
-      if (res.success) {
-        setResult(res.data);
-      } else {
-        setError(res.error.message);
-      }
-    } catch {
-      setError('Unable to connect to backend.');
-    } finally {
-      setLoading(false);
-    }
+    const res = await getEntityWallets(trimmed);
+    setLoading(false);
 
+    if (res.success) {
+      setResult(res.data);
+    } else {
+      setError(res.error.message);
+    }
   }, []);
 
   const handleSubmit = (e: React.FormEvent) => {
