@@ -8,6 +8,8 @@ export type TransactionType =
   | 'borrow'
   | 'repay'
   | 'stake'
+  | 'unstake'
+  | 'other'
   | 'nft_mint'
   | 'nft_transfer'
   | 'contract_deploy'

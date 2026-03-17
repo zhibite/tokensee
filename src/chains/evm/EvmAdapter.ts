@@ -12,9 +12,11 @@ import { CacheService, CACHE_KEYS, TTL } from '../../services/cache/CacheService
 import { NATIVE_TOKEN_ADDRESS } from '../../config/chains.config.js';
 
 const NATIVE_INFO: Record<string, { symbol: string; name: string }> = {
-  arbitrum: { symbol: 'ETH',  name: 'Ethereum' },
-  polygon:  { symbol: 'MATIC', name: 'Polygon' },
-  base:     { symbol: 'ETH',  name: 'Ethereum' },
+  arbitrum:  { symbol: 'ETH',  name: 'Ethereum' },
+  polygon:   { symbol: 'MATIC', name: 'Polygon' },
+  base:      { symbol: 'ETH',  name: 'Ethereum' },
+  optimism:  { symbol: 'ETH',  name: 'Ethereum' },
+  avalanche: { symbol: 'AVAX', name: 'Avalanche' },
 };
 
 export class EvmAdapter implements IChainAdapter {

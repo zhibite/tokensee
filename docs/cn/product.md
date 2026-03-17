@@ -372,9 +372,9 @@ GET /v1/smart-money/wallets
 ## 七、产品路线图
 
 ### ✅ MVP（已完成）
-- [x] ETH + BSC 交易解码 API（三层 ABI 策略）
-- [x] 70+ 地址实体库（交易所、桥、混币器、机构基金）
-- [x] 巨鲸预警监控 Worker（ETH + BSC）
+- [x] 7 链交易解码 API（ETH / BSC / ARB / POLYGON / BASE / OP / AVAX，三层 ABI 策略）
+- [x] 50,000+ 地址实体库（协议 / 黑客 / DAO / Token / 制裁名单等，20 个来源）
+- [x] 巨鲸预警监控 Worker（7 链全覆盖）
 - [x] 多链持仓查询 API（原生 + ERC-20 代币）
 - [x] 地址 Activity 历史记录流（游标分页）
 - [x] 前端 Demo（落地页 + 地址画像 + 预警大屏）

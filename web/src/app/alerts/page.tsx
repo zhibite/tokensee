@@ -11,7 +11,7 @@ export default function AlertsPage() {
   return (
     <div className="min-h-screen bg-zinc-950">
       <NavBar />
-      <main className="max-w-3xl mx-auto px-4 py-10">
+      <main className="max-w-5xl mx-auto px-4 py-10">
 
         {/* Header */}
         <div className="mb-8">

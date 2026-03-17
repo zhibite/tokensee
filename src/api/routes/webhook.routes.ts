@@ -82,15 +82,15 @@ webhookRoutes.get('/', async (_req: Request, res: Response) => {
       `SELECT id, name, url, event_types, chains, min_usd, active, created_at
        FROM webhooks ORDER BY created_at DESC`
     );
-    return res.json({ success: true, data: result.rows });
+    return res.json({ success: true, data: { items: result.rows } });
   } catch {
-    return res.json({ success: true, data: [] });
+    return res.json({ success: true, data: { items: [] } });
   }
 });
 
 // DELETE /v1/webhooks/:id
 webhookRoutes.delete('/:id', async (req: Request, res: Response) => {
-  const id = parseInt(req.params.id, 10);
+  const id = parseInt(req.params['id'] as string, 10);
   if (isNaN(id)) {
     return res.status(400).json({ success: false, error: { code: 'INVALID_ID', message: 'invalid webhook id' } });
   }
@@ -107,7 +107,7 @@ webhookRoutes.delete('/:id', async (req: Request, res: Response) => {
 
 // GET /v1/webhooks/:id/logs — recent delivery log
 webhookRoutes.get('/:id/logs', async (req: Request, res: Response) => {
-  const id = parseInt(req.params.id, 10);
+  const id = parseInt(req.params['id'] as string, 10);
   if (isNaN(id)) {
     return res.status(400).json({ success: false, error: { code: 'INVALID_ID', message: 'invalid webhook id' } });
   }

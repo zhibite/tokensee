@@ -1,6 +1,7 @@
 import { db } from '../db/Database.js';
 import { CacheService, TTL } from '../cache/CacheService.js';
 import { ENTITY_MAP, KNOWN_ENTITIES, type KnownEntity } from './known-entities.js';
+import { bloomFilterService } from './BloomFilterService.js';
 import type { SupportedChain } from '../../types/chain.types.js';
 
 export interface EntityInfo {
@@ -26,12 +27,15 @@ export class EntityService {
     const staticEntry = ENTITY_MAP.get(`${addr}:${chain}`) ?? ENTITY_MAP.get(`${addr}:multi`);
     if (staticEntry) return this.toInfo(staticEntry, 'static');
 
-    // 2. Redis cache
+    // 2. Bloom filter — skip Redis + DB entirely if address is definitely absent
+    if (!bloomFilterService.test(addr, chain)) return null;
+
+    // 3. Redis cache
     const cacheKey = `entity:${addr}:${chain}`;
     const cached = await cache.get<EntityInfo>(cacheKey);
     if (cached !== null) return cached;
 
-    // 3. PostgreSQL
+    // 4. PostgreSQL
     try {
       const row = await db.queryOne<{
         address: string; label: string; entity_name: string;
@@ -139,6 +143,7 @@ export class EntityService {
                  updated_at = NOW()`,
           [e.address.toLowerCase(), e.chain, e.label, e.entity_name, e.entity_type, e.tags ?? []]
         );
+        bloomFilterService.add(e.address, e.chain);
         inserted++;
       } catch {
         // ignore individual failures

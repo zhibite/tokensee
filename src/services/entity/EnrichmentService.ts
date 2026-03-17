@@ -1,5 +1,6 @@
 /**
  * EnrichmentService — automatically labels unknown addresses by querying:
+ *   0. GoPlus Security Malicious Address API (blacklist check — first wins if flagged)
  *   1. Alchemy alchemy_getTokenMetadata  (ERC-20 tokens)
  *   2. On-chain name() / symbol() call via viem  (most DeFi contracts)
  *   3. Sourcify contract metadata  (verified contracts, no API key needed)
@@ -14,12 +15,42 @@
  *     → next lookup hits DB cache
  */
 
+import crypto from 'crypto';
 import axios from 'axios';
 import { createPublicClient, http, parseAbi } from 'viem';
 import * as viemChains from 'viem/chains';
 import { db } from '../db/Database.js';
 import { env } from '../../config/index.js';
 import type { SupportedChain } from '../../types/chain.types.js';
+
+// ---------------------------------------------------------------------------
+// GoPlus Security — Malicious Address API
+// ---------------------------------------------------------------------------
+const GOPLUS_BASE = 'https://api.gopluslabs.io/api/v1';
+
+const GOPLUS_CHAIN_ID: Partial<Record<SupportedChain, string>> = {
+  ethereum:  '1',
+  bsc:       '56',
+  polygon:   '137',
+  arbitrum:  '42161',
+  base:      '8453',
+  optimism:  '10',
+  avalanche: '43114',
+};
+
+const GOPLUS_RISK_TAGS: Record<string, string> = {
+  phishing_activities:         'phishing',
+  blackmail_activities:        'blackmail',
+  stealing_attack:             'theft',
+  fake_kyc:                    'fake_kyc',
+  malicious_mining_activities: 'mining_malware',
+  darkweb_transactions:        'darkweb',
+  cybercrime:                  'cybercrime',
+  money_laundering:            'money_laundering',
+  financial_crime:             'financial_crime',
+  blacklist_doubt:             'blacklist',
+  honeypot_related_address:    'honeypot',
+};
 
 // ---------------------------------------------------------------------------
 // Chain configs
@@ -122,6 +153,10 @@ class EnrichmentService {
   private drainTimer: NodeJS.Timeout | null = null;
   private etherscanReachable: boolean | null = null; // null = untested
 
+  // GoPlus token cache
+  private goplusToken:     string | null = null;
+  private goplusExpiresAt: number        = 0;
+
   start(): void {
     if (this.drainTimer) return;
     this.drainTimer = setInterval(() => this.drain(), 600);
@@ -170,7 +205,22 @@ class EnrichmentService {
       );
       if (existing) return { saved: false };
 
-      // Try each source in order — first hit wins
+      // Source 0: GoPlus security blacklist check (high confidence, runs first)
+      const goplusResult = await this.tryGoPlus(address, chain);
+      if (goplusResult) {
+        await db.query(
+          `INSERT INTO entities (address, chain, label, entity_name, entity_type, confidence, source, tags)
+           VALUES ($1, $2, $3, $4, 'hacker', 'high', 'goplus', $5)
+           ON CONFLICT (address, chain) DO UPDATE
+             SET entity_type = 'hacker', label = EXCLUDED.label,
+                 confidence = 'high', source = 'goplus', tags = EXCLUDED.tags, updated_at = NOW()`,
+          [address, chain, goplusResult.name, goplusResult.name, goplusResult.tags]
+        );
+        console.log(`[Enrichment] 🚨 ${chain} ${address.slice(0, 10)}… → ${goplusResult.name} via goplus`);
+        return { saved: true, contractName: goplusResult.name, entity_type: 'hacker' };
+      }
+
+      // Sources 1-4: contract/token identification (first hit wins)
       const result =
         await this.tryAlchemyTokenMetadata(address, chain) ??
         await this.tryOnChainName(address, chain) ??
@@ -240,7 +290,7 @@ class EnrichmentService {
       const addr = address as `0x${string}`;
 
       // First check it has code (is a contract)
-      const code = await client.getBytecode({ address: addr });
+      const code = await client.getCode({ address: addr });
       if (!code || code === '0x') return null; // EOA
 
       // Try name()
@@ -298,6 +348,63 @@ class EnrichmentService {
 
       const entity_type = guessEntityType(contractName);
       return { name: contractName, entity_type, source: 'sourcify' };
+    } catch {
+      return null;
+    }
+  }
+
+  /** Source 0: GoPlus Security Malicious Address API */
+  private async tryGoPlus(
+    address: string, chain: SupportedChain,
+  ): Promise<{ name: string; tags: string } | null> {
+    const appKey    = process.env.GOPLUS_APP_KEY    ?? '';
+    const appSecret = process.env.GOPLUS_APP_SECRET ?? '';
+    if (!appKey || !appSecret) return null;
+
+    const chainId = GOPLUS_CHAIN_ID[chain];
+    if (!chainId) return null;
+
+    try {
+      // Lazy token fetch + refresh when expired
+      if (!this.goplusToken || Date.now() >= this.goplusExpiresAt) {
+        const time = Math.floor(Date.now() / 1000);
+        const sign = crypto.createHash('sha1')
+          .update(appKey + time + appSecret)
+          .digest('hex');
+        const resp = await axios.post<{
+          code: number; result: { access_token: string; expires_in: number };
+        }>(`${GOPLUS_BASE}/token`, { app_key: appKey, time, sign }, { timeout: 8_000 });
+        if (resp.data.code !== 1) return null;
+        this.goplusToken     = resp.data.result.access_token;
+        this.goplusExpiresAt = Date.now() + (resp.data.result.expires_in - 60) * 1000;
+      }
+
+      const resp = await axios.get<{
+        code: number; result: Record<string, string>;
+      }>(`${GOPLUS_BASE}/address_security/${address}?chain_id=${chainId}`, {
+        headers: { Authorization: this.goplusToken },
+        timeout: 6_000,
+      });
+
+      if (resp.data.code !== 1) return null;
+      const r = resp.data.result;
+      if (!r || Object.keys(r).length === 0) return null;
+
+      // Collect flagged risk tags
+      const tags: string[] = [];
+      const labels: string[] = [];
+      for (const [field, tag] of Object.entries(GOPLUS_RISK_TAGS)) {
+        if (r[field] === '1') {
+          tags.push(tag);
+          labels.push(field.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()));
+        }
+      }
+      if (tags.length === 0) return null;
+
+      return {
+        name: `GoPlus: ${labels.join(', ')}`,
+        tags: `{${tags.map((t) => `"${t}"`).join(',')}}`,
+      };
     } catch {
       return null;
     }

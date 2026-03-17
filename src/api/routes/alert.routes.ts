@@ -61,7 +61,7 @@ interface AlertRow {
 alertRoutes.get('/', async (req: Request, res: Response) => {
   const chain     = req.query.chain as string | undefined;
   const alertType = req.query.type  as string | undefined;
-  const minUsd    = parseFloat((req.query.min_usd as string) ?? '100000');
+  const minUsd    = parseFloat((req.query.min_usd as string) ?? (process.env.WHALE_USD_THRESHOLD ?? '1000000'));
   const limit     = Math.min(parseInt((req.query.limit as string) ?? '20', 10), 100);
   const cursor    = req.query.cursor ? BigInt(req.query.cursor as string) : null;
 
@@ -109,7 +109,7 @@ alertRoutes.get('/', async (req: Request, res: Response) => {
     });
   } catch (err) {
     // DB not available — return empty instead of 500
-    console.warn('[alerts] DB query failed:', (err as Error).message);
+    console.error('[alerts] DB query failed:', (err as Error).message);
     return res.json({ success: true, data: { items: [], cursor: null, has_more: false } });
   }
 });
