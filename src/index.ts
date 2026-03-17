@@ -1,6 +1,7 @@
 import { createServer } from './api/server.js';
 import { env } from './config/index.js';
 import { whaleMonitor } from './services/monitor/WhaleMonitor.js';
+import { bloomFilterService } from './services/entity/BloomFilterService.js';
 
 const app = createServer();
 
@@ -20,6 +21,9 @@ const server = app.listen(env.PORT, () => {
     GET  /v1/alerts
     GET  /v1/address/:addr/entity
   `);
+
+  // Start Bloom Filter async load (non-blocking, lookups degrade gracefully until ready)
+  bloomFilterService.init();
 
   // Start whale monitor background worker
   whaleMonitor.start();

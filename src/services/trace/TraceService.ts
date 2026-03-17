@@ -103,12 +103,11 @@ export class TraceService {
     try {
       const response = await axios.post<{
         result?: {
-          calls?: Array<{
-            from: string;
-            to: string;
-            value?: string;
-            type: string;
-          }>;
+          from: string;
+          to: string;
+          value?: string;
+          type: string;
+          calls?: unknown[];
         };
       }>(
         url,

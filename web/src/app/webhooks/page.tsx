@@ -11,7 +11,7 @@ export default function WebhooksPage() {
   return (
     <div className="min-h-screen bg-zinc-950">
       <NavBar />
-      <main className="max-w-3xl mx-auto px-4 py-10">
+      <main className="max-w-5xl mx-auto px-4 py-10">
         <div className="mb-8">
           <p className="text-xs text-zinc-500 uppercase tracking-widest mb-3">Webhooks</p>
           <h1 className="text-2xl font-bold text-white mb-2">Webhook Management</h1>

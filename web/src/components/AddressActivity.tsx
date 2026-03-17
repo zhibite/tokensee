@@ -28,14 +28,15 @@ export function AddressActivity({ address }: Props) {
   const [loadingMore, setLoadingMore] = useState(false);
 
   const load = useCallback(async (append = false, nextCursor?: string) => {
-    const res = await getActivity(address, { limit: 20, cursor: nextCursor });
-    if (res.success) {
-      setItems((prev) => append ? [...prev, ...res.data.items] : res.data.items);
-      setCursor(res.data.cursor);
-      setHasMore(res.data.has_more);
-    }
-    setLoading(false);
-    setLoadingMore(false);
+    try {
+      const res = await getActivity(address, { limit: 20, cursor: nextCursor });
+      if (res.success) {
+        setItems((prev) => append ? [...prev, ...res.data.items] : res.data.items);
+        setCursor(res.data.cursor);
+        setHasMore(res.data.has_more);
+      }
+    } catch { /* backend unavailable */ }
+    finally { setLoading(false); setLoadingMore(false); }
   }, [address]);
 
   useEffect(() => {

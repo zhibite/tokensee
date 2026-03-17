@@ -207,6 +207,25 @@ export interface SmartMoneyWallet {
   tags: string[];
 }
 
+export interface SmartMoneyWalletWithActivity extends SmartMoneyWallet {
+  activity_30d: number;
+}
+
+export interface SmartMoneyWalletsResponse {
+  success: true;
+  data: { wallets: SmartMoneyWalletWithActivity[]; total: number };
+}
+export type SmartMoneyWalletsResult = SmartMoneyWalletsResponse | DecodeError;
+
+export interface SmartMoneyCategoryStat {
+  count: number; volume_usd: number; wallets: number;
+}
+export interface SmartMoneyStatsResponse {
+  success: true;
+  data: { by_category: Record<string, SmartMoneyCategoryStat>; total_wallets: number };
+}
+export type SmartMoneyStatsResult = SmartMoneyStatsResponse | DecodeError;
+
 export interface SmartMoneyMove {
   id: string;
   wallet_address: string;
@@ -295,6 +314,59 @@ export interface GraphData {
 
 export interface GraphResponse { success: true; data: GraphData }
 export type GraphResult = GraphResponse | DecodeError;
+
+// Entity Library types
+export interface EntityRecord {
+  id: number;
+  address: string;
+  chain: string;
+  label: string;
+  entity_name: string;
+  entity_type: string;
+  confidence: string;
+  source: string;
+  tags: string[];
+}
+
+export interface EntityStatsData {
+  total: number;
+  by_type:   Record<string, number>;
+  by_source: Record<string, number>;
+  by_chain:  Record<string, number>;
+}
+
+export interface EntitySearchResponse {
+  success: true;
+  data: { items: EntityRecord[]; total: number; page: number; limit: number };
+}
+export interface EntityStatsResponse { success: true; data: EntityStatsData }
+export type EntitySearchResult = EntitySearchResponse | DecodeError;
+export type EntityStatsResult  = EntityStatsResponse  | DecodeError;
+
+// Social Identity types
+export type SocialPlatform = 'ens' | 'lens' | 'farcaster' | 'entity';
+
+export interface SocialIdentity {
+  platform:    SocialPlatform;
+  handle:      string;
+  label:       string;
+  entity_type: string;
+  confidence:  'high' | 'medium' | 'low';
+  source:      string;
+  chain:       string;
+}
+
+export interface SocialProfile {
+  address:    string;
+  identities: SocialIdentity[];
+  ens:        string | null;
+  lens:       string | null;
+  farcaster:  string | null;
+  entity:     string | null;
+}
+
+export interface SocialProfileResponse { success: true; data: SocialProfile }
+export type SocialProfileResult = SocialProfileResponse | DecodeError;
 
 // Stats types
 export interface ChainStat  { chain: string;  count: number; volume_usd: number }
