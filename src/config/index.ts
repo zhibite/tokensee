@@ -5,7 +5,7 @@ config(); // load .env
 
 const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
-  PORT: z.coerce.number().default(3000),
+  PORT: z.coerce.number().default(8080),
   FRONTEND_URL: z.string().url().optional(),
 
   // Database

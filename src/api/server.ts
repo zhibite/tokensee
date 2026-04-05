@@ -25,9 +25,9 @@ export function createServer(): express.Application {
   // CORS — allow frontend dev server and any configured origin
   app.use((req: Request, res: Response, next: NextFunction) => {
     const allowed = [
-      'http://localhost:6001',
-      'http://127.0.0.1:6001',
-      'http://localhost:6000',
+      'http://localhost:8081',
+      'http://127.0.0.1:8081',
+      'http://localhost:8080',
       env.FRONTEND_URL,
     ].filter(Boolean);
 

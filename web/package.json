@@ -3,9 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev --hostname 127.0.0.1 --port 6001",
+    "dev": "next dev --hostname 127.0.0.1 --port 8081",
     "build": "next build",
-    "start": "next start --hostname 127.0.0.1 --port 6001"
+    "start": "next start --hostname 127.0.0.1 --port 8081"
   },
   "dependencies": {
     "next": "^15.5.12",
