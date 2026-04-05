@@ -39,6 +39,8 @@ export interface DecodedTransaction {
   sender_entity: { label: string; entity_name: string; entity_type: string } | null;
   contract_address: string | null;
   contract_entity: { label: string; entity_name: string; entity_type: string } | null;
+  status?: 0 | 1;
+  value_wei?: string;
 
   // Semantic classification
   type: TransactionType;
@@ -55,6 +57,7 @@ export interface DecodedTransaction {
   // Costs
   gas_used: string;
   gas_price_gwei: string;
+  gas_price_wei?: string;
   fee_eth: string;
   fee_usd: string | null;
 

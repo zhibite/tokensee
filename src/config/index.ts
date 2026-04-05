@@ -6,6 +6,7 @@ config(); // load .env
 const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
   PORT: z.coerce.number().default(3000),
+  FRONTEND_URL: z.string().url().optional(),
 
   // Database
   DATABASE_URL: z.string().url(),
@@ -15,13 +16,13 @@ const envSchema = z.object({
 
   // RPC Providers
   ALCHEMY_API_KEY: z.string().min(1),
-  QUICKNODE_ETH_URL: z.string().url().optional(),
-  QUICKNODE_BSC_URL: z.string().url().optional(),
-  ALCHEMY_ARBITRUM_URL: z.string().url().optional(),
-  ALCHEMY_POLYGON_URL: z.string().url().optional(),
-  ALCHEMY_BASE_URL: z.string().url().optional(),
-  ALCHEMY_OPTIMISM_URL: z.string().url().optional(),
-  ALCHEMY_AVALANCHE_URL: z.string().url().optional(),
+  QUICKNODE_ETH_URL: z.string().url().optional().or(z.literal('')),
+  QUICKNODE_BSC_URL: z.string().url().optional().or(z.literal('')),
+  ALCHEMY_ARBITRUM_URL: z.string().url().optional().or(z.literal('')),
+  ALCHEMY_POLYGON_URL: z.string().url().optional().or(z.literal('')),
+  ALCHEMY_BASE_URL: z.string().url().optional().or(z.literal('')),
+  ALCHEMY_OPTIMISM_URL: z.string().url().optional().or(z.literal('')),
+  ALCHEMY_AVALANCHE_URL: z.string().url().optional().or(z.literal('')),
 
   // External APIs
   COINGECKO_API_KEY: z.string().optional(),
@@ -30,6 +31,12 @@ const envSchema = z.object({
 
   // Auth
   API_KEY_SALT: z.string().min(16),
+
+  // Webhooks
+  ALLOW_PRIVATE_WEBHOOK_URLS: z
+    .enum(['true', 'false'])
+    .optional()
+    .transform((value) => (value === undefined ? undefined : value === 'true')),
 });
 
 const parsed = envSchema.safeParse(process.env);

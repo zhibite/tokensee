@@ -4,11 +4,16 @@
  *
  * Runs as a background interval in src/index.ts.
  * Polling interval: 30s ETH (12s block), 15s BSC (3s block)
+ *
+ * Optimizations applied:
+ * 1. Block number caching (5s TTL) — shared across chains to avoid duplicate eth_blockNumber calls
+ * 2. Alchemy batch RPC — multiple requests in a single HTTP round-trip to reduce CU consumption
+ * 3. Per-chain RPC provider routing — free public RPCs for L2/BSC, paid Alchemy for ETH
  */
 
 import { EventEmitter } from 'events';
-import { formatUnits, type Log } from 'viem';
-import { rpcManager } from '../rpc/RpcManager.js';
+import { formatUnits, type Log, type PublicClient } from 'viem';
+import { rpcManager, type BlockData } from '../rpc/RpcManager.js';
 import { entityService } from '../entity/EntityService.js';
 import { enrichmentService } from '../entity/EnrichmentService.js';
 import { clusteringService } from '../entity/ClusteringService.js';
@@ -128,6 +133,7 @@ interface WhaleAlert {
 export class WhaleMonitor {
   private lastBlock: Partial<Record<SupportedChain, bigint>> = {};
   private failCount: Partial<Record<SupportedChain, number>> = {};
+  private backoffUntil: Partial<Record<SupportedChain, number>> = {};
   private running = false;
   private timers: NodeJS.Timeout[] = [];
 
@@ -177,8 +183,12 @@ export class WhaleMonitor {
   }
 
   private async scanChain(chain: SupportedChain): Promise<void> {
+    const backoffUntil = this.backoffUntil[chain] ?? 0;
+    if (backoffUntil > Date.now()) return;
+
     try {
-      const latestBlock = await rpcManager.call(chain, (c) => c.getBlockNumber());
+      // Use cached block number (5s TTL) to avoid duplicate eth_blockNumber calls across chains
+      const latestBlock = await rpcManager.getCachedBlockNumber(chain);
       const fromBlock = (this.lastBlock[chain] ?? latestBlock - 2n) + 1n;
 
       if (fromBlock > latestBlock) return;
@@ -186,11 +196,11 @@ export class WhaleMonitor {
       // Cap scan range to avoid overwhelming on first start
       const toBlock = latestBlock < fromBlock + 5n ? latestBlock : fromBlock + 4n;
 
-      await this.scanNativeTransfers(chain, fromBlock, toBlock);
-      await this.scanErc20Transfers(chain, fromBlock, toBlock);
+      await this.scanBlocks(chain, fromBlock, toBlock);
 
       this.lastBlock[chain] = latestBlock;
       this.failCount[chain] = 0; // reset on success
+      this.backoffUntil[chain] = 0;
     } catch (err) {
       const fails = (this.failCount[chain] ?? 0) + 1;
       this.failCount[chain] = fails;
@@ -199,93 +209,196 @@ export class WhaleMonitor {
         console.warn(`[WhaleMonitor] ${chain} scan error (${fails}/${this.MAX_FAILS}):`, (err as Error).message.slice(0, 80));
       } else if (fails === this.MAX_FAILS + 1) {
         console.warn(`[WhaleMonitor] ${chain} suspended for 10min after ${this.MAX_FAILS} failures.`);
+        this.backoffUntil[chain] = Date.now() + this.BACKOFF_MS;
         // Reset fail count after backoff so it retries later
-        setTimeout(() => { this.failCount[chain] = 0; }, this.BACKOFF_MS);
+        setTimeout(() => {
+          this.failCount[chain] = 0;
+          this.backoffUntil[chain] = 0;
+        }, this.BACKOFF_MS);
       }
       // If fails > MAX_FAILS, silently skip until backoff resets the counter
     }
   }
 
   /**
-   * Detect large native ETH/BNB transfers by scanning blocks directly
+   * Unified block scanner — fetches native transfers + ERC20 logs using batched RPC calls.
+   * All block data fetched in batch (vs. per-block RTT), then processed in parallel.
    */
-  private async scanNativeTransfers(
+  private async scanBlocks(
     chain: SupportedChain,
     fromBlock: bigint,
     toBlock: bigint
   ): Promise<void> {
     const nativeSymbol = NATIVE_SYMBOL[chain] ?? 'ETH';
-    const price = await priceService.getPrice(nativeSymbol);
-    if (!price) return;
+    const nativePrice = await priceService.getPrice(nativeSymbol);
 
-    for (let blockNum = fromBlock; blockNum <= toBlock; blockNum++) {
+    // Generate block range
+    const blockRange: bigint[] = [];
+    for (let bn = fromBlock; bn <= toBlock; bn++) {
+      blockRange.push(bn);
+    }
+
+    // Step 1: Batch fetch all blocks with transactions (single RTT for all blocks)
+    const blocks = await this.fetchBlocksWithTxs(chain, blockRange);
+
+    // Step 2: Batch fetch all ERC20 Transfer logs (already single getLogs call)
+    const trackedAddresses = Object.keys(TRACKED_TOKENS[chain] ?? {}) as `0x${string}`[];
+    let logs: Log[] = [];
+    if (trackedAddresses.length > 0) {
       try {
-        const block = await rpcManager.call(chain, (c) =>
-          c.getBlock({ blockNumber: blockNum, includeTransactions: true })
+        logs = await rpcManager.call(chain, (c) =>
+          c.getLogs({
+            fromBlock,
+            toBlock,
+            address: trackedAddresses,
+            event: {
+              type: 'event',
+              name: 'Transfer',
+              inputs: [
+                { type: 'address', name: 'from', indexed: true },
+                { type: 'address', name: 'to', indexed: true },
+                { type: 'uint256', name: 'value', indexed: false },
+              ],
+            },
+          })
         );
-
-        for (const tx of block.transactions) {
-          if (typeof tx === 'string') continue;
-          if (!tx.value || tx.value === 0n) continue;
-          if (!tx.to) continue; // contract deploy
-
-          const amount = parseFloat(formatUnits(tx.value, 18));
-          const amountUsd = amount * price;
-          if (amountUsd < USD_THRESHOLD) continue;
-
-          const alert = await this.buildAlert({
-            txHash: tx.hash,
-            chain,
-            blockNumber: block.number ?? blockNum,
-            timestamp: Number(block.timestamp),
-            from: tx.from,
-            to: tx.to,
-            assetAddress: NATIVE_TOKEN_ADDRESS,
-            assetSymbol: nativeSymbol,
-            amount: amount.toFixed(6),
-            amountUsd,
-          });
-
-          await this.persistAlert(alert);
-        }
       } catch {
-        // skip individual block failures
+        logs = [];
+      }
+    }
+
+    // Build block timestamp lookup from the blocks we already fetched
+    const blockTimestampMap = new Map<bigint, number>();
+    const txBlocks = new Map<bigint, BlockData>();
+    for (const [bn, block] of blocks) {
+      if (block?.timestamp) {
+        blockTimestampMap.set(bn, Number(block.timestamp));
+      }
+      txBlocks.set(bn, block);
+    }
+
+    // Process native transfers (needs transactions)
+    if (nativePrice && txBlocks.size > 0) {
+      const nativeAlerts = await this.processNativeTransfers(chain, txBlocks, nativeSymbol, nativePrice);
+      for (const alert of nativeAlerts) {
+        await this.persistAlert(alert);
+      }
+    }
+
+    // Process ERC20 transfers (needs timestamps only)
+    if (logs.length > 0) {
+      // Batch fetch timestamps for blocks we don't have yet (single batch RPC)
+      const missingBlocks = blockRange.filter((bn) => !blockTimestampMap.has(bn));
+      if (missingBlocks.length > 0) {
+        const timestamps = await rpcManager.batchRpc(
+          chain,
+          missingBlocks.map((bn) => ({
+            method: 'eth_getBlockByNumber',
+            params: ['0x' + bn.toString(16), false],
+          }))
+        );
+        timestamps.forEach((ts, i) => {
+          if (ts && typeof ts === 'object') {
+            const blockData = ts as { timestamp?: string };
+            if (blockData.timestamp) {
+              blockTimestampMap.set(missingBlocks[i], parseInt(blockData.timestamp, 16));
+            }
+          }
+        });
+      }
+
+      const erc20Alerts = await this.processErc20Transfers(chain, logs, blockTimestampMap);
+      for (const alert of erc20Alerts) {
+        await this.persistAlert(alert);
       }
     }
   }
 
   /**
-   * Detect large ERC-20 transfers via Transfer event logs
+   * Fetch blocks with transactions in a single batch RPC call.
+   * This is the most CU-intensive call but unavoidable for native transfer detection.
    */
-  private async scanErc20Transfers(
+  private async fetchBlocksWithTxs(
     chain: SupportedChain,
-    fromBlock: bigint,
-    toBlock: bigint
-  ): Promise<void> {
-    const trackedAddresses = Object.keys(TRACKED_TOKENS[chain] ?? {}) as `0x${string}`[];
-    if (trackedAddresses.length === 0) return;
+    blockNumbers: bigint[]
+  ): Promise<Map<bigint, BlockData>> {
+    // Use batch RPC to fetch all blocks with txs in one HTTP round-trip
+    const results = await rpcManager.batchRpc(
+      chain,
+      blockNumbers.map((bn) => ({
+        method: 'eth_getBlockByNumber',
+        params: ['0x' + bn.toString(16), true], // includeTransactions: true
+      }))
+    );
 
-    let logs: Log[];
-    try {
-      logs = await rpcManager.call(chain, (c) =>
-        c.getLogs({
-          fromBlock,
-          toBlock,
-          address: trackedAddresses,
-          event: {
-            type: 'event',
-            name: 'Transfer',
-            inputs: [
-              { type: 'address', name: 'from', indexed: true },
-              { type: 'address', name: 'to', indexed: true },
-              { type: 'uint256', name: 'value', indexed: false },
-            ],
-          },
-        })
-      );
-    } catch {
-      return;
+    const map = new Map<bigint, BlockData>();
+    results.forEach((result, i) => {
+      if (result && typeof result === 'object') {
+        const bd = result as Record<string, unknown>;
+        const txs = (bd.transactions ?? []) as Array<Record<string, unknown>>;
+        map.set(blockNumbers[i], {
+          number: bd.number ? BigInt(bd.number as string) : blockNumbers[i],
+          timestamp: bd.timestamp ? BigInt(bd.timestamp as string) : 0n,
+          transactions: txs.map((tx) => ({
+            hash: (tx.hash ?? '0x') as `0x${string}`,
+            from: (tx.from ?? '0x0000000000000000000000000000000000000000') as `0x${string}`,
+            to: (tx.to ?? null) as `0x${string}` | null,
+            value: BigInt((tx.value ?? '0') as string),
+          })),
+        });
+      }
+    });
+
+    return map;
+  }
+
+  private async processNativeTransfers(
+    chain: SupportedChain,
+    blocks: Map<bigint, BlockData>,
+    nativeSymbol: string,
+    price: number
+  ): Promise<WhaleAlert[]> {
+    const alerts: WhaleAlert[] = [];
+
+    for (const [blockNum, block] of blocks) {
+      if (!block?.transactions?.length) continue;
+
+      for (const tx of block.transactions) {
+        if (!tx.value || tx.value === 0n) continue;
+        if (!tx.to) continue;
+
+        const amount = parseFloat(formatUnits(tx.value, 18));
+        const amountUsd = amount * price;
+        if (amountUsd < USD_THRESHOLD) continue;
+
+        const timestamp = block.timestamp ? Number(block.timestamp) : Math.floor(Date.now() / 1000);
+
+        const alert = await this.buildAlert({
+          txHash: tx.hash,
+          chain,
+          blockNumber: block.number ?? blockNum,
+          timestamp,
+          from: tx.from,
+          to: tx.to,
+          assetAddress: NATIVE_TOKEN_ADDRESS,
+          assetSymbol: nativeSymbol,
+          amount: amount.toFixed(6),
+          amountUsd,
+        });
+
+        alerts.push(alert);
+      }
     }
+
+    return alerts;
+  }
+
+  private async processErc20Transfers(
+    chain: SupportedChain,
+    logs: Log[],
+    blockTimestampMap: Map<bigint, number>
+  ): Promise<WhaleAlert[]> {
+    const alerts: WhaleAlert[] = [];
 
     for (const log of logs) {
       if (!log.topics || log.topics[0] !== ERC20_TRANSFER_TOPIC) continue;
@@ -302,20 +415,19 @@ export class WhaleMonitor {
       const rawValue = BigInt(log.data);
 
       const amount = parseFloat(formatUnits(rawValue, tokenMeta.decimals));
-      const price = await priceService.getPrice(tokenMeta.symbol);
-      const amountUsd = price ? amount * price : null;
+      const tokenPrice = await priceService.getPrice(tokenMeta.symbol);
+      const amountUsd = tokenPrice ? amount * tokenPrice : null;
 
       if (amountUsd === null || amountUsd < USD_THRESHOLD) continue;
 
-      const block = await rpcManager.call(chain, (c) =>
-        c.getBlock({ blockNumber: log.blockNumber! })
-      ).catch(() => null);
+      const blockNum = log.blockNumber!;
+      const timestamp = blockTimestampMap.get(blockNum) ?? Math.floor(Date.now() / 1000);
 
       const alert = await this.buildAlert({
         txHash: log.transactionHash!,
         chain,
-        blockNumber: log.blockNumber!,
-        timestamp: block ? Number(block.timestamp) : Math.floor(Date.now() / 1000),
+        blockNumber: blockNum,
+        timestamp,
         from,
         to,
         assetAddress: tokenAddr,
@@ -324,8 +436,10 @@ export class WhaleMonitor {
         amountUsd,
       });
 
-      await this.persistAlert(alert);
+      alerts.push(alert);
     }
+
+    return alerts;
   }
 
   private async buildAlert(params: {

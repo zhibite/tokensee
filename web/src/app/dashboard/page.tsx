@@ -9,7 +9,7 @@ export const metadata: Metadata = {
   description: 'Real-time on-chain activity stats — whale volume, chain distribution, top assets.',
 };
 
-export const revalidate = 60;
+export const dynamic = 'force-dynamic';
 
 const ALERT_TYPE_LABELS: Record<string, string> = {
   large_transfer:    'Large Transfer',

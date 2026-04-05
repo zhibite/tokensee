@@ -17,6 +17,7 @@ import { securityRoutes } from './routes/security.routes.js';
 import { flowRoutes } from './routes/flow.routes.js';
 import { apiKeyMiddleware } from './middleware/apiKey.js';
 import type { ApiError } from '../types/transaction.types.js';
+import { env } from '../config/index.js';
 
 export function createServer(): express.Application {
   const app = express();
@@ -25,12 +26,13 @@ export function createServer(): express.Application {
   app.use((req: Request, res: Response, next: NextFunction) => {
     const allowed = [
       'http://localhost:6001',
+      'http://127.0.0.1:6001',
       'http://localhost:6000',
-      process.env.FRONTEND_URL,
+      env.FRONTEND_URL,
     ].filter(Boolean);
 
     const origin = req.headers.origin ?? '';
-    if (allowed.includes(origin) || process.env.NODE_ENV !== 'production') {
+    if (allowed.includes(origin) || env.NODE_ENV !== 'production') {
       res.setHeader('Access-Control-Allow-Origin', origin || '*');
       res.setHeader('Access-Control-Allow-Methods', 'GET,POST,DELETE,OPTIONS');
       res.setHeader('Access-Control-Allow-Headers', 'Content-Type,X-Api-Key,X-Request-Id');
@@ -91,7 +93,7 @@ export function createServer(): express.Application {
       success: false,
       error: {
         code: 'INTERNAL_ERROR',
-        message: process.env.NODE_ENV === 'development' ? err.message : 'An unexpected error occurred',
+        message: env.NODE_ENV === 'development' ? err.message : 'An unexpected error occurred',
       },
     };
     res.status(500).json(error);

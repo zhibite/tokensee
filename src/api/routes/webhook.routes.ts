@@ -16,6 +16,7 @@ import type { Request, Response } from 'express';
 import { randomBytes } from 'crypto';
 import { db } from '../../services/db/Database.js';
 import type { ApiError } from '../../types/transaction.types.js';
+import { getWebhookUrlSafety } from '../../services/webhook/WebhookUrlPolicy.js';
 
 export const webhookRoutes = Router();
 
@@ -41,6 +42,11 @@ webhookRoutes.post('/', async (req: Request, res: Response) => {
   }
   if (!url || !isValidHttpUrl(url)) {
     const error: ApiError = { success: false, error: { code: 'INVALID_URL', message: 'url must be a valid http/https URL' } };
+    return res.status(400).json(error);
+  }
+  const safety = await getWebhookUrlSafety(url);
+  if (!safety.safe) {
+    const error: ApiError = { success: false, error: { code: 'UNSAFE_URL', message: safety.reason ?? 'webhook url is not allowed' } };
     return res.status(400).json(error);
   }
 

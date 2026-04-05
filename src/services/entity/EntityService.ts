@@ -32,8 +32,8 @@ export class EntityService {
 
     // 3. Redis cache
     const cacheKey = `entity:${addr}:${chain}`;
-    const cached = await cache.get<EntityInfo>(cacheKey);
-    if (cached !== null) return cached;
+    const cached = await cache.getEntry<EntityInfo>(cacheKey);
+    if (cached.hit) return cached.value;
 
     // 4. PostgreSQL
     try {

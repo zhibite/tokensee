@@ -1,4 +1,4 @@
-import { createHash } from 'crypto';
+import { createHash, randomBytes } from 'crypto';
 import type { Request, Response, NextFunction } from 'express';
 import { db } from '../../services/db/Database.js';
 import { env } from '../../config/index.js';
@@ -86,7 +86,7 @@ export async function apiKeyMiddleware(
  * Returns the raw key (shown once) and the stored hash.
  */
 export async function createApiKey(name: string, tier = 'free'): Promise<{ raw: string; hash: string }> {
-  const raw = `ts_${createHash('sha256').update(Math.random().toString() + Date.now()).digest('hex').slice(0, 40)}`;
+  const raw = `ts_${randomBytes(20).toString('hex')}`;
   const hash = hashKey(raw);
   const rateLimitRpm = tier === 'pro' ? 600 : tier === 'starter' ? 180 : 60;
 

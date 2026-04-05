@@ -15,8 +15,8 @@ export class EnsService {
     const lower = address.toLowerCase();
     const cacheKey = `name:${lower}`;
 
-    const cached = await cache.get<string | null>(cacheKey);
-    if (cached !== undefined) return cached;
+    const cached = await cache.getEntry<string>(cacheKey);
+    if (cached.hit) return cached.value;
 
     try {
       const client = rpcManager.getClient('ethereum');
@@ -48,8 +48,8 @@ export class EnsService {
    */
   async getAddress(name: string): Promise<string | null> {
     const cacheKey = `addr:${name.toLowerCase()}`;
-    const cached = await cache.get<string | null>(cacheKey);
-    if (cached !== undefined) return cached;
+    const cached = await cache.getEntry<string>(cacheKey);
+    if (cached.hit) return cached.value;
 
     try {
       const client = rpcManager.getClient('ethereum');

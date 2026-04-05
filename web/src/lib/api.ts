@@ -7,32 +7,83 @@ import type {
   EntitySearchResult, EntityStatsResult, SocialProfileResult,
 } from './types';
 
-// Prefer same-origin proxy in dev (works for LAN access too).
-// If NEXT_PUBLIC_API_URL is set, use it as absolute origin.
-const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? '';
-const API_V1 = API_BASE ? `${API_BASE}/v1` : '/api/v1';
+type ApiFetchInit = RequestInit & {
+  next?: { revalidate?: number | false; tags?: string[] };
+};
+
+const DEFAULT_SERVER_ORIGIN = 'http://127.0.0.1:6000';
+const BROWSER_API_BASE = process.env.NEXT_PUBLIC_API_URL
+  ? `${process.env.NEXT_PUBLIC_API_URL}/v1`
+  : '/api/v1';
+const SERVER_API_ORIGIN =
+  process.env.API_ORIGIN_INTERNAL ??
+  process.env.NEXT_PUBLIC_API_URL ??
+  DEFAULT_SERVER_ORIGIN;
+const DEFAULT_TIMEOUT_MS = 8_000;
+
+function getApiBase(): string {
+  return typeof window === 'undefined'
+    ? `${SERVER_API_ORIGIN}/v1`
+    : BROWSER_API_BASE;
+}
+
+async function apiFetch(
+  path: string,
+  init?: ApiFetchInit,
+  timeoutMs = DEFAULT_TIMEOUT_MS
+): Promise<Response> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    return await fetch(`${getApiBase()}${path}`, { ...init, signal: controller.signal });
+  } catch {
+    return new Response(
+      JSON.stringify({
+        success: false,
+        error: {
+          code: 'UPSTREAM_UNAVAILABLE',
+          message: `Backend unavailable on ${SERVER_API_ORIGIN}`,
+        },
+      }),
+      {
+        status: 503,
+        headers: { 'Content-Type': 'application/json' },
+      }
+    );
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+async function apiJson<T>(
+  path: string,
+  init?: ApiFetchInit,
+  timeoutMs = DEFAULT_TIMEOUT_MS
+): Promise<T> {
+  const res = await apiFetch(path, init, timeoutMs);
+  return res.json() as Promise<T>;
+}
 
 export async function decodeTx(
   hash: string,
   chain: SupportedChain
 ): Promise<DecodeResponse | DecodeError> {
-  const res = await fetch(`${API_V1}/tx/decode`, {
+  return apiJson<DecodeResponse | DecodeError>('/tx/decode', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ hash, chain }),
   });
-  return res.json();
 }
 
 export async function getPortfolio(
   address: string,
   chains: string = 'ethereum,bsc,arbitrum,polygon,base,optimism,avalanche'
 ): Promise<PortfolioResult> {
-  const res = await fetch(
-    `${API_V1}/account/${address}/portfolio?chains=${chains}`,
+  return apiJson<PortfolioResult>(
+    `/account/${address}/portfolio?chains=${chains}`,
     { next: { revalidate: 60 } }
   );
-  return res.json();
 }
 
 export async function getAlerts(params?: {
@@ -49,8 +100,7 @@ export async function getAlerts(params?: {
   if (params?.limit)   qs.set('limit',   String(params.limit));
   if (params?.cursor)  qs.set('cursor',  params.cursor);
 
-  const res = await fetch(`${API_V1}/alerts?${qs}`, { next: { revalidate: 30 } });
-  return res.json();
+  return apiJson<AlertsResult>(`/alerts?${qs}`, { next: { revalidate: 30 } });
 }
 
 export async function getActivity(
@@ -62,26 +112,23 @@ export async function getActivity(
   if (params?.limit)  qs.set('limit',  String(params.limit));
   if (params?.cursor) qs.set('cursor', params.cursor);
 
-  const res = await fetch(
-    `${API_V1}/account/${address}/activity?${qs}`,
+  return apiJson<ActivityResult>(
+    `/account/${address}/activity?${qs}`,
     { cache: 'no-store' }
   );
-  return res.json();
 }
 
 export async function getEntityWallets(entityName: string): Promise<EntityWalletsResult> {
-  const res = await fetch(
-    `${API_V1}/entity/${encodeURIComponent(entityName)}/wallets`,
+  return apiJson<EntityWalletsResult>(
+    `/entity/${encodeURIComponent(entityName)}/wallets`,
     { cache: 'no-store' }
   );
-  return res.json();
 }
 
 // ── Webhooks ────────────────────────────────────────────────────────────────
 
 export async function listWebhooks(): Promise<WebhooksListResult> {
-  const res = await fetch(`${API_V1}/webhooks`, { cache: 'no-store' });
-  return res.json();
+  return apiJson<WebhooksListResult>('/webhooks', { cache: 'no-store' });
 }
 
 export async function createWebhook(payload: {
@@ -91,17 +138,15 @@ export async function createWebhook(payload: {
   chains?: string[];
   min_usd?: number;
 }): Promise<WebhookResult> {
-  const res = await fetch(`${API_V1}/webhooks`, {
+  return apiJson<WebhookResult>('/webhooks', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
   });
-  return res.json();
 }
 
 export async function deleteWebhook(id: string): Promise<{ success: boolean }> {
-  const res = await fetch(`${API_V1}/webhooks/${id}`, { method: 'DELETE' });
-  return res.json();
+  return apiJson<{ success: boolean }>(`/webhooks/${id}`, { method: 'DELETE' });
 }
 
 // ── Smart Money ─────────────────────────────────────────────────────────────
@@ -117,8 +162,7 @@ export async function getSmartMoneyActivity(params?: {
   if (params?.category) qs.set('category', params.category);
   if (params?.limit)    qs.set('limit',    String(params.limit));
   if (params?.cursor)   qs.set('cursor',   params.cursor);
-  const res = await fetch(`${API_V1}/smart-money/activity?${qs}`, { cache: 'no-store' });
-  return res.json();
+  return apiJson<SmartMoneyActivityResult>(`/smart-money/activity?${qs}`, { cache: 'no-store' });
 }
 
 export async function getSmartMoneyWallets(params?: {
@@ -130,20 +174,17 @@ export async function getSmartMoneyWallets(params?: {
   if (params?.category) qs.set('category', params.category);
   if (params?.limit)    qs.set('limit',    String(params.limit));
   if (params?.offset)   qs.set('offset',   String(params.offset));
-  const res = await fetch(`${API_V1}/smart-money/wallets?${qs}`, { cache: 'no-store' });
-  return res.json();
+  return apiJson<SmartMoneyWalletsResult>(`/smart-money/wallets?${qs}`, { cache: 'no-store' });
 }
 
 export async function getSmartMoneyStats(): Promise<SmartMoneyStatsResult> {
-  const res = await fetch(`${API_V1}/smart-money/stats`, { cache: 'no-store' });
-  return res.json();
+  return apiJson<SmartMoneyStatsResult>('/smart-money/stats', { cache: 'no-store' });
 }
 
 // ── Alert Rules ──────────────────────────────────────────────────────────────
 
 export async function listAlertRules(): Promise<AlertRulesResult> {
-  const res = await fetch(`${API_V1}/alert-rules`, { cache: 'no-store' });
-  return res.json();
+  return apiJson<AlertRulesResult>('/alert-rules', { cache: 'no-store' });
 }
 
 export async function createAlertRule(payload: {
@@ -152,41 +193,36 @@ export async function createAlertRule(payload: {
   conditions: AlertRuleConditions;
   webhook_id?: string;
 }): Promise<{ success: boolean; data?: unknown; error?: unknown }> {
-  const res = await fetch(`${API_V1}/alert-rules`, {
+  return apiJson<{ success: boolean; data?: unknown; error?: unknown }>('/alert-rules', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
   });
-  return res.json();
 }
 
 export async function deleteAlertRule(id: string): Promise<{ success: boolean }> {
-  const res = await fetch(`${API_V1}/alert-rules/${id}`, { method: 'DELETE' });
-  return res.json();
+  return apiJson<{ success: boolean }>(`/alert-rules/${id}`, { method: 'DELETE' });
 }
 
 export async function patchAlertRule(id: string, patch: { active?: boolean }): Promise<{ success: boolean }> {
-  const res = await fetch(`${API_V1}/alert-rules/${id}`, {
+  return apiJson<{ success: boolean }>(`/alert-rules/${id}`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(patch),
   });
-  return res.json();
 }
 
 // ── Address Graph ────────────────────────────────────────────────────────────
 
 export async function getAddressGraph(address: string, chain?: string): Promise<GraphResult> {
   const qs = chain ? `?chain=${chain}` : '';
-  const res = await fetch(`${API_V1}/address/${address}/graph${qs}`, { cache: 'no-store' });
-  return res.json();
+  return apiJson<GraphResult>(`/address/${address}/graph${qs}`, { cache: 'no-store' });
 }
 
 // ── Entity Library ───────────────────────────────────────────────────────────
 
 export async function getEntityStats(): Promise<EntityStatsResult> {
-  const res = await fetch(`${API_V1}/entity/stats`, { cache: 'no-store' });
-  return res.json();
+  return apiJson<EntityStatsResult>('/entity/stats', { cache: 'no-store' });
 }
 
 export async function searchEntities(params?: {
@@ -198,46 +234,41 @@ export async function searchEntities(params?: {
   if (params?.chain) qs.set('chain', params.chain);
   if (params?.page)  qs.set('page',  String(params.page));
   if (params?.limit) qs.set('limit', String(params.limit));
-  const res = await fetch(`${API_V1}/entity/search?${qs}`, { cache: 'no-store' });
-  return res.json();
+  return apiJson<EntitySearchResult>(`/entity/search?${qs}`, { cache: 'no-store' });
 }
 
 export async function addEntity(payload: {
   address: string; chain: string; label: string;
   entity_name: string; entity_type: string; confidence?: string; tags?: string[];
 }): Promise<{ success: boolean; data?: unknown; error?: { message: string } }> {
-  const res = await fetch(`${API_V1}/entity`, {
+  return apiJson<{ success: boolean; data?: unknown; error?: { message: string } }>('/entity', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
   });
-  return res.json();
 }
 
 export async function deleteEntity(
   address: string, chain: string
 ): Promise<{ success: boolean; error?: { message: string } }> {
-  const res = await fetch(
-    `${API_V1}/entity/${address}?chain=${chain}`,
+  return apiJson<{ success: boolean; error?: { message: string } }>(
+    `/entity/${address}?chain=${chain}`,
     { method: 'DELETE' }
   );
-  return res.json();
 }
 
 // ── Social Identity ──────────────────────────────────────────────────────────
 
 export async function getSocialProfile(address: string): Promise<SocialProfileResult> {
-  const res = await fetch(`${API_V1}/address/${address}/social`, { cache: 'no-store' });
-  return res.json();
+  return apiJson<SocialProfileResult>(`/address/${address}/social`, { cache: 'no-store' });
 }
 
 // ── Stats ───────────────────────────────────────────────────────────────────
 
 export async function getStats(window: '1h' | '24h' | '7d' = '24h'): Promise<StatsResult> {
-  const res = await fetch(`${API_V1}/stats?window=${window}`, {
+  return apiJson<StatsResult>(`/stats?window=${window}`, {
     next: { revalidate: 60 },
   });
-  return res.json();
 }
 
 // ── Intelligence ─────────────────────────────────────────────────────────────
@@ -255,35 +286,30 @@ export async function getIntelligence(params?: {
   if (params?.severity) qs.set('severity', params.severity);
   if (params?.limit)    qs.set('limit',    String(params.limit));
   if (params?.cursor)   qs.set('cursor',   params.cursor);
-  const res = await fetch(`${API_V1}/intelligence?${qs}`, { cache: 'no-store' });
-  return res.json();
+  return apiJson<IntelligenceResult>(`/intelligence?${qs}`, { cache: 'no-store' });
 }
 
 // ── Security ─────────────────────────────────────────────────────────────────
 
 export async function getSecuritySummary(): Promise<SecuritySummaryResult> {
-  const res = await fetch(`${API_V1}/security/summary`, { cache: 'no-store' });
-  return res.json();
+  return apiJson<SecuritySummaryResult>('/security/summary', { cache: 'no-store' });
 }
 
 export async function getSecurityHackers(params?: { limit?: number; days?: number }): Promise<SecurityHackersResult> {
   const qs = new URLSearchParams();
   if (params?.limit) qs.set('limit', String(params.limit));
   if (params?.days)  qs.set('days',  String(params.days));
-  const res = await fetch(`${API_V1}/security/hackers?${qs}`, { cache: 'no-store' });
-  return res.json();
+  return apiJson<SecurityHackersResult>(`/security/hackers?${qs}`, { cache: 'no-store' });
 }
 
 export async function getSecurityMixers(): Promise<SecurityMixersResult> {
-  const res = await fetch(`${API_V1}/security/mixers`, { cache: 'no-store' });
-  return res.json();
+  return apiJson<SecurityMixersResult>('/security/mixers', { cache: 'no-store' });
 }
 
 export async function getSecuritySanctioned(params?: { limit?: number }): Promise<SecuritySanctionedResult> {
   const qs = new URLSearchParams();
   if (params?.limit) qs.set('limit', String(params.limit));
-  const res = await fetch(`${API_V1}/security/sanctioned?${qs}`, { cache: 'no-store' });
-  return res.json();
+  return apiJson<SecuritySanctionedResult>(`/security/sanctioned?${qs}`, { cache: 'no-store' });
 }
 
 // ── Fund Flow ─────────────────────────────────────────────────────────────────
@@ -297,8 +323,7 @@ export async function getFlowPairs(params?: {
   if (params?.chain)  qs.set('chain',  params.chain);
   if (params?.window) qs.set('window', params.window);
   if (params?.limit)  qs.set('limit',  String(params.limit));
-  const res = await fetch(`${API_V1}/flow/pairs?${qs}`, { cache: 'no-store' });
-  return res.json();
+  return apiJson<FlowPairsResult>(`/flow/pairs?${qs}`, { cache: 'no-store' });
 }
 
 // ── New result types (inline to avoid circular imports) ───────────────────────

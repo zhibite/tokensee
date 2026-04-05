@@ -28,6 +28,11 @@ let redis: Redis | null = null;
 let memoryCache: MemoryCache | null = null;
 let redisAvailable = true;
 
+export interface CacheLookup<T> {
+  hit: boolean;
+  value: T | null;
+}
+
 function getBackend(): Redis | MemoryCache {
   if (!redisAvailable) {
     if (!memoryCache) memoryCache = new MemoryCache();
@@ -65,7 +70,7 @@ export class CacheService {
     return `${this.prefix}:${k}`;
   }
 
-  async get<T>(key: string): Promise<T | null> {
+  async getEntry<T>(key: string): Promise<CacheLookup<T>> {
     try {
       const backend = getBackend();
       let raw: string | null;
@@ -74,11 +79,16 @@ export class CacheService {
       } else {
         raw = await backend.get(this.key(key));
       }
-      if (!raw) return null;
-      return JSON.parse(raw) as T;
+      if (raw === null) return { hit: false, value: null };
+      return { hit: true, value: JSON.parse(raw) as T };
     } catch {
-      return null;
+      return { hit: false, value: null };
     }
+  }
+
+  async get<T>(key: string): Promise<T | null> {
+    const entry = await this.getEntry<T>(key);
+    return entry.value;
   }
 
   async set(key: string, value: unknown, ttlSeconds: number): Promise<void> {

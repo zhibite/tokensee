@@ -13,6 +13,7 @@
 import axios from 'axios';
 import { createHmac } from 'crypto';
 import { db } from '../db/Database.js';
+import { getWebhookUrlSafety } from './WebhookUrlPolicy.js';
 
 interface WebhookRow {
   id: string;
@@ -84,6 +85,14 @@ export class WebhookService {
   }
 
   private async deliver(webhook: WebhookRow, alert: AlertPayload): Promise<void> {
+    const safety = await getWebhookUrlSafety(webhook.url);
+    if (!safety.safe) {
+      const error = safety.reason ?? 'webhook url is not allowed';
+      await this.logDelivery(webhook.id, alert.id, 1, undefined, false, 0, error);
+      console.warn(`[Webhook] Skipped unsafe webhook ${webhook.id}: ${error}`);
+      return;
+    }
+
     const body = JSON.stringify({ event: 'whale_alert', data: alert });
     const signature = this.sign(body, webhook.secret);
 
@@ -102,6 +111,7 @@ export class WebhookService {
             'User-Agent': 'TokenSee-Webhook/1.0',
           },
           timeout: TIMEOUT_MS,
+          maxRedirects: 0,
           validateStatus: () => true, // don't throw on non-2xx
         });
 

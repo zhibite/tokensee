@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { getAlerts } from '@/lib/api';
 import type { WhaleAlert, AlertType } from '@/lib/types';
-import { shortenAddress, formatTimestamp } from '@/lib/utils';
+import { shortenAddress, formatTimestamp, CHAIN_EXPLORERS } from '@/lib/utils';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? '';
 const API_V1 = API_BASE ? `${API_BASE}/v1` : '/api/v1';
@@ -215,7 +215,7 @@ export function AlertFeed() {
 }
 
 function AlertRow({ alert }: { alert: WhaleAlert }) {
-  const explorerBase = alert.chain === 'ethereum' ? 'https://etherscan.io' : 'https://bscscan.com';
+  const explorerBase = CHAIN_EXPLORERS[alert.chain] ?? 'https://etherscan.io';
   const colors = ALERT_TYPE_COLORS[alert.alert_type] ?? ALERT_TYPE_COLORS.large_transfer;
 
   const formatUsd = (usd: number) =>
