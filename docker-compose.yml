@@ -6,32 +6,37 @@ services:
     container_name: tokensee_postgres
     environment:
       POSTGRES_USER: tokensee
-      POSTGRES_PASSWORD: tokensee_dev_password
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?PostgreSQL password not set}
       POSTGRES_DB: tokensee
     ports:
-      - '5432:5432'
+      - '127.0.0.1:5432:5432'
     volumes:
-      - tokensee_pgdata:/var/lib/postgresql/data
+      - tokensee_pg_data:/var/lib/postgresql/data
     healthcheck:
       test: ['CMD-SHELL', 'pg_isready -U tokensee']
       interval: 5s
       timeout: 5s
       retries: 5
+    restart: unless-stopped
 
   redis:
     image: redis:7-alpine
     container_name: tokensee_redis
+    command: >
+      redis-server
+      --appendonly yes
+      ${REDIS_PASSWORD:+--requirepass $REDIS_PASSWORD}
     ports:
-      - '6379:6379'
+      - '127.0.0.1:6379:6379'
     volumes:
-      - tokensee_redisdata:/data
-    command: redis-server --appendonly yes
+      - tokensee_redis_data:/data
     healthcheck:
-      test: ['CMD', 'redis-cli', 'ping']
+      test: ['CMD', 'redis-cli${REDIS_PASSWORD:+ -a $REDIS_PASSWORD}', 'ping']
       interval: 5s
       timeout: 3s
       retries: 5
+    restart: unless-stopped
 
 volumes:
-  tokensee_pgdata:
-  tokensee_redisdata:
+  tokensee_pg_data:
+  tokensee_redis_data:
