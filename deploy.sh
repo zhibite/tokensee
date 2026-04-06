@@ -39,6 +39,7 @@ load_config() {
 }
 
 save_config() {
+  mkdir -p "$INSTALL_DIR"
   cat > "$CONFIG_FILE" << EOF
 INSTALL_DIR=$INSTALL_DIR
 DOMAIN=$DOMAIN
@@ -160,6 +161,7 @@ do_step2() {
     return 0
   fi
 
+  mkdir -p "$INSTALL_DIR"
   cd "$INSTALL_DIR"
 
   # 随机生成密码
