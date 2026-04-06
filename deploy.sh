@@ -4,7 +4,7 @@
 # 支持系统: Ubuntu 22.04+ / Debian 12+
 # 运行方式: bash deploy.sh
 # ============================================================
-set -euo pipefail
+set -eu
 
 # ── 颜色 ──────────────────────────────────────────────
 RED='\033[0;31m';  GREEN='\033[0;32m';  YELLOW='\033[1;33m'
@@ -33,6 +33,27 @@ load_config() {
     set -a
     source "$CONFIG_FILE"
     set +a
+    # 确保变量有值，避免 set -u 报错
+    DOMAIN="${DOMAIN:-}"
+    API_DOMAIN="${API_DOMAIN:-}"
+    API_PORT="${API_PORT:-3080}"
+    WEB_PORT="${WEB_PORT:-3081}"
+    GH_TOKEN="${GH_TOKEN:-}"
+    PG_PASSWORD="${PG_PASSWORD:-}"
+    REDIS_PASSWORD="${REDIS_PASSWORD:-}"
+    REDIS_URL="${REDIS_URL:-}"
+    API_SALT="${API_SALT:-}"
+    ALCHEMY_KEY="${ALCHEMY_KEY:-}"
+    ETHERSCAN_KEY="${ETHERSCAN_KEY:-}"
+    COINGECKO_KEY="${COINGECKO_KEY:-}"
+    BSCSCAN_KEY="${BSCSCAN_KEY:-}"
+    DUNE_API_KEY="${DUNE_API_KEY:-}"
+    DEBANK_API_KEY="${DEBANK_API_KEY:-}"
+    ARKHAM_API_KEY="${ARKHAM_API_KEY:-}"
+    THEGRAPH_API_KEY="${THEGRAPH_API_KEY:-}"
+    GOPLUS_APP_KEY="${GOPLUS_APP_KEY:-}"
+    GOPLUS_APP_SECRET="${GOPLUS_APP_SECRET:-}"
+    QUICKNODE_BSC_URL="${QUICKNODE_BSC_URL:-}"
     return 0
   fi
   return 1
@@ -67,7 +88,7 @@ EOF
 }
 
 mark_done() { echo "$1" >> "$PROGRESS_FILE"; }
-is_done()   { grep -q "^$1$" "$PROGRESS_FILE" 2>/dev/null; }
+is_done()   { grep "^$1\$" "$PROGRESS_FILE" >/dev/null 2>&1; }
 
 gen_pass()  { openssl rand -base64 32 | tr -dc 'a-zA-Z0-9' | head -c 20; }
 
@@ -114,11 +135,20 @@ do_step1() {
   # Docker
   if ! command -v docker &>/dev/null; then
     info "安装 Docker..."
-    apt-get install -y -qq docker.io docker-compose-plugin > /dev/null 2>&1
+    apt-get install -y -qq docker.io > /dev/null 2>&1
     systemctl start docker && systemctl enable docker
     ok "Docker 安装完成 ($(docker --version | cut -d' ' -f3 | tr -d ','))"
   else
     ok "Docker 已安装 ($(docker --version | cut -d' ' -f3 | tr -d ','))"
+  fi
+
+  # docker-compose standalone
+  if ! command -v docker-compose &>/dev/null; then
+    info "安装 docker-compose..."
+    curl -fsSL https://github.com/docker/compose/releases/download/v2.24.0/docker-compose-linux-x86_64 -o /usr/local/bin/docker-compose
+    chmod +x /usr/local/bin/docker-compose
+    ln -sf /usr/local/bin/docker-compose /usr/bin/docker-compose 2>/dev/null || true
+    ok "docker-compose 安装完成"
   fi
 
   # Nginx
@@ -161,6 +191,15 @@ do_step2() {
     return 0
   fi
 
+  # 确保 docker-compose 可用
+  if ! command -v docker-compose &>/dev/null; then
+    info "安装 docker-compose..."
+    curl -fsSL https://github.com/docker/compose/releases/download/v2.24.0/docker-compose-linux-x86_64 -o /usr/local/bin/docker-compose
+    chmod +x /usr/local/bin/docker-compose
+    ln -sf /usr/local/bin/docker-compose /usr/bin/docker-compose 2>/dev/null || true
+    ok "docker-compose 安装完成"
+  fi
+
   mkdir -p "$INSTALL_DIR"
   cd "$INSTALL_DIR"
 
@@ -181,13 +220,54 @@ POSTGRES_PASSWORD=$PG_PASSWORD
 REDIS_PASSWORD=$REDIS_PASSWORD
 EOF
 
+  # 生成 docker-compose.yml
+  cat > "$INSTALL_DIR/docker-compose.yml" << 'YML'
+version: '3.8'
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: tokensee_postgres
+    restart: always
+    environment:
+      POSTGRES_USER: tokensee
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U tokensee"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    container_name: tokensee_redis
+    restart: always
+    command: redis-server --requirepass ${REDIS_PASSWORD}
+    volumes:
+      - redis_data:/data
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  postgres_data:
+  redis_data:
+YML
+
   # 清理旧容器
   docker rm -f tokensee_postgres 2>/dev/null || true
   docker rm -f tokensee_redis   2>/dev/null || true
 
   info "启动 PostgreSQL 和 Redis..."
-  POSTGRES_PASSWORD="$PG_PASSWORD" REDIS_PASSWORD="$REDIS_PASSWORD" \
-    docker-compose up -d
+  cd "$INSTALL_DIR"
+  docker-compose up -d
 
   # 等待 PostgreSQL
   info "等待 PostgreSQL 就绪..."
@@ -202,14 +282,14 @@ EOF
 
   # 创建数据库和用户
   docker exec tokensee_postgres psql -U tokensee -tc \
-    "SELECT 1 FROM pg_roles WHERE rolname='tokensee'" | grep -q 1 \
+    "SELECT 1 FROM pg_roles WHERE rolname='tokensee'" | grep 1 >/dev/null 2>&1 \
     || docker exec tokensee_postgres psql -U tokensee -c \
-    "CREATE USER tokensee WITH PASSWORD '$PG_PASSWORD';"
+    "CREATE USER tokensee WITH PASSWORD '$PG_PASSWORD';" || true
 
   docker exec tokensee_postgres psql -U tokensee -tc \
-    "SELECT 1 FROM pg_database WHERE datname='tokensee'" | grep -q 1 \
+    "SELECT 1 FROM pg_database WHERE datname='tokensee'" | grep 1 >/dev/null 2>&1 \
     || docker exec tokensee_postgres psql -U tokensee -c \
-    "CREATE DATABASE tokensee OWNER tokensee;"
+    "CREATE DATABASE tokensee OWNER tokensee;" || true
 
   docker exec tokensee_postgres psql -U tokensee -c \
     "GRANT ALL PRIVILEGES ON DATABASE tokensee TO tokensee;"
@@ -217,10 +297,10 @@ EOF
   # 等待 Redis
   info "等待 Redis 就绪..."
   for i in {1..20}; do
-    docker exec tokensee_redis redis-cli -a "$REDIS_PASSWORD" --no-auth-warning ping 2>/dev/null | grep -q PONG && break
+    docker exec tokensee_redis redis-cli -a "$REDIS_PASSWORD" --no-auth-warning ping 2>/dev/null | grep PONG >/dev/null 2>&1 && break
     sleep 1
   done
-  if ! docker exec tokensee_redis redis-cli -a "$REDIS_PASSWORD" --no-auth-warning ping 2>/dev/null | grep -q PONG; then
+  if ! docker exec tokensee_redis redis-cli -a "$REDIS_PASSWORD" --no-auth-warning ping 2>/dev/null | grep PONG >/dev/null 2>&1; then
     error "Redis 启动超时"; return 1
   fi
   ok "Redis 就绪"
@@ -240,9 +320,21 @@ do_step3() {
     return 0
   fi
 
+  # 与 step4 / next 默认一致，避免 API_PORT 未写入配置时构建出错误的 API_PROXY_TARGET
+  DOMAIN="${DOMAIN:-tokensee.com}"
+  API_DOMAIN="${API_DOMAIN:-api.tokensee.com}"
+  API_PORT="${API_PORT:-3080}"
+  WEB_PORT="${WEB_PORT:-3081}"
+
   # 如果代码目录不存在，先拉取
+  mkdir -p "$INSTALL_DIR"
   if [[ ! -d "$INSTALL_DIR/.git" ]]; then
-    mkdir -p "$(dirname "$INSTALL_DIR")"
+    # 清理残留的非空目录
+    if [[ -d "$INSTALL_DIR" ]] && [[ -n "$(ls -A "$INSTALL_DIR" 2>/dev/null)" ]]; then
+      warn "目录 $INSTALL_DIR 非空，清理后重新克隆..."
+      rm -rf "$INSTALL_DIR"
+      mkdir -p "$(dirname "$INSTALL_DIR")"
+    fi
     info "克隆仓库到 $INSTALL_DIR..."
     if [[ -n "$GH_TOKEN" ]]; then
       git clone "https://$GH_TOKEN@github.com/zhibite/tokensee.git" "$INSTALL_DIR"
@@ -250,10 +342,7 @@ do_step3() {
       git clone https://github.com/zhibite/tokensee.git "$INSTALL_DIR"
     fi
   else
-    info "更新代码..."
-    cd "$INSTALL_DIR"
-    [[ -n "$GH_TOKEN" ]] && git remote set-url origin "https://$GH_TOKEN@github.com/zhibite/tokensee.git"
-    git pull origin master
+    info "代码目录已存在，跳过克隆"
   fi
 
   # 生成生产环境变量文件
@@ -285,6 +374,9 @@ WHALE_USD_THRESHOLD=1000000
 ALLOW_PRIVATE_WEBHOOK_URLS=false
 ENVEOF
 
+  # 同时生成 .env（迁移脚本用 dotenv 默认加载 .env）
+  cp "$INSTALL_DIR/.env.production" "$INSTALL_DIR/.env"
+
   # 安装后端依赖 + 编译
   info "安装后端依赖..."
   npm install --prefix "$INSTALL_DIR" 2>&1 | tail -3
@@ -297,7 +389,8 @@ ENVEOF
 
   # 数据库迁移
   info "运行数据库迁移..."
-  npm run migrate --prefix "$INSTALL_DIR" 2>&1 | tail -10 || warn "迁移失败，请手动检查"
+  cd "$INSTALL_DIR"
+  npm run migrate 2>&1 | tail -10 || warn "迁移失败，请手动检查"
 
   # 前端构建
   cd "$INSTALL_DIR/web"
@@ -319,6 +412,14 @@ ENVEOF
 do_step4() {
   sep "第四步：配置 Nginx + 启动服务"
 
+  # 配置写死
+  INSTALL_DIR="/opt/tokensee"
+  DOMAIN="tokensee.com"
+  API_DOMAIN="api.tokensee.com"
+  API_PORT=${API_PORT:-3080}
+  WEB_PORT=${WEB_PORT:-3081}
+  info "配置: INSTALL_DIR=$INSTALL_DIR DOMAIN=$DOMAIN API_DOMAIN=$API_DOMAIN API_PORT=$API_PORT WEB_PORT=$WEB_PORT"
+
   # PM2 清理旧进程
   info "清理旧 PM2 进程..."
   pm2 delete tokensee-api 2>/dev/null || true
@@ -327,9 +428,15 @@ do_step4() {
   mkdir -p /var/log/tokensee
 
   # 加载环境变量
-  set -a
-  source "$INSTALL_DIR/.env.production"
-  set +a
+  if [[ -f "$INSTALL_DIR/.env.production" ]]; then
+    cd "$INSTALL_DIR"
+    set -a
+    source "$INSTALL_DIR/.env.production"
+    set +a
+  else
+    error "未找到 .env.production，请先执行第三步"
+    return 1
+  fi
 
   # PM2 配置：API
   info "创建 PM2 进程配置..."
@@ -408,12 +515,21 @@ EOF
 
   # PM2 开机自启
   PM2_CMD=$(pm2 startup 2>&1 || true)
-  if echo "$PM2_CMD" | grep -q "sudo"; then
+  if echo "$PM2_CMD" | grep "sudo" >/dev/null 2>&1; then
     echo "$PM2_CMD"
   fi
 
   # Nginx 配置
   info "配置 Nginx..."
+
+  # 清理旧配置
+  rm -f /etc/nginx/sites-available/tokensee-web
+  rm -f /etc/nginx/sites-available/tokensee-api
+  rm -f /etc/nginx/sites-enabled/tokensee-web
+  rm -f /etc/nginx/sites-enabled/tokensee-api
+
+  # 临时禁用 set -u，避免 Nginx 内置变量被当成未定义 shell 变量
+  set +u
 
   cat > /etc/nginx/sites-available/tokensee-web << 'NGINX'
 server {
@@ -452,6 +568,8 @@ server {
 }
 NGINX
 
+  set -u
+
   sed -i "s|DOMAIN_PLACEHOLDER|$DOMAIN|g"               /etc/nginx/sites-available/tokensee-web
   sed -i "s|WEB_PORT_PLACEHOLDER|$WEB_PORT|g"           /etc/nginx/sites-available/tokensee-web
   sed -i "s|API_DOMAIN_PLACEHOLDER|$API_DOMAIN|g"       /etc/nginx/sites-available/tokensee-api
@@ -461,7 +579,7 @@ NGINX
   ln -sf /etc/nginx/sites-available/tokensee-web /etc/nginx/sites-enabled/
   ln -sf /etc/nginx/sites-available/tokensee-api  /etc/nginx/sites-enabled/
 
-  if ! nginx -t 2>&1 | grep -q "syntax is ok"; then
+  if ! nginx -t >/dev/null 2>&1; then
     error "Nginx 配置有误："
     nginx -t
     return 1
@@ -474,7 +592,7 @@ NGINX
   echo ""
   info "验证服务..."
   sleep 2
-  if curl -sf "http://127.0.0.1:$API_PORT/health" 2>/dev/null | grep -q "ok"; then
+  if curl -sf "http://127.0.0.1:$API_PORT/health" 2>/dev/null | grep "ok" >/dev/null 2>&1; then
     ok "后端 API 健康检查通过"
   else
     warn "后端 API 未响应，运行 pm2 logs tokensee-api 查看"
@@ -540,7 +658,7 @@ do_validate() {
 
   curl_test() {
     local url=$1 label=$2
-    if curl -sf --resolve "${3:-}:80:127.0.0.1" "$url" 2>/dev/null | head -1 | grep -q "200\|301\|302\|ok"; then
+    if curl -sf --resolve "${3:-}:80:127.0.0.1" "$url" 2>/dev/null | head -1 | grep "200\|301\|302\|ok" >/dev/null 2>&1; then
       ok "$label OK"
     else
       error "$label FAILED"
@@ -550,7 +668,7 @@ do_validate() {
 
   # 数据库容器
   docker exec tokensee_postgres pg_isready -U tokensee &>/dev/null && ok "PostgreSQL 容器 OK" || { error "PostgreSQL FAILED"; FAILED=1; }
-  docker exec tokensee_redis redis-cli -a "$REDIS_PASSWORD" --no-auth-warning ping 2>/dev/null | grep -q PONG && ok "Redis 容器 OK" || { error "Redis FAILED"; FAILED=1; }
+  docker exec tokensee_redis redis-cli -a "$REDIS_PASSWORD" --no-auth-warning ping 2>/dev/null | grep PONG >/dev/null 2>&1 && ok "Redis 容器 OK" || { error "Redis FAILED"; FAILED=1; }
 
   # 本地端口
   curl_test "http://127.0.0.1:$API_PORT/health" "后端 API (127.0.0.1:$API_PORT)"
@@ -572,25 +690,16 @@ do_validate() {
 interactive_config() {
   sep "配置信息"
 
-  read -p "安装目录 [/opt/tokensee]: " INPUT
-  INSTALL_DIR=${INPUT:-/opt/tokensee}
-
-  read -p "前端域名 [tokensee.com]: " DOMAIN
-  DOMAIN=${DOMAIN:-tokensee.com}
-
-  read -p "API 域名 [api.tokensee.com]: " API_DOMAIN
-  API_DOMAIN=${API_DOMAIN:-api.tokensee.com}
-
-  read -p "后端端口 [3080]: " API_PORT
+  # 域名写死，无需加载旧配置
+  DOMAIN="tokensee.com"
+  API_DOMAIN="api.tokensee.com"
   API_PORT=${API_PORT:-3080}
-
-  read -p "前端端口 [3081]: " WEB_PORT
   WEB_PORT=${WEB_PORT:-3081}
 
   read -p "GitHub Token（私有仓库或网络受限必填）: " GH_TOKEN
 
   echo ""
-  info "以下 API Key 全部可选，回车留空即可跳过"
+  info "以下 API Key 全部可选，直接回车留空"
   read -p "Alchemy API Key: " ALCHEMY_KEY
   read -p "Etherscan API Key: " ETHERSCAN_KEY
   read -p "CoinGecko API Key: " COINGECKO_KEY
@@ -598,15 +707,10 @@ interactive_config() {
   read -p "QuickNode BSC URL: " QUICKNODE_BSC_URL
   read -p "Dune API Key: " DUNE_API_KEY
   read -p "DeBank API Key: " DEBANK_API_KEY
-  read -p "Arkham API Key: " ARKHAM_KEY
+  read -p "Arkham API Key: " ARKHAM_API_KEY
   read -p "TheGraph API Key: " THEGRAPH_API_KEY
   read -p "GoPlus App Key: " GOPLUS_APP_KEY
   read -p "GoPlus App Secret: " GOPLUS_APP_SECRET
-
-  PG_PASSWORD=""
-  REDIS_PASSWORD=""
-  REDIS_URL=""
-  API_SALT=""
 
   save_config
 }

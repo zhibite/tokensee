@@ -11,7 +11,8 @@ type ApiFetchInit = RequestInit & {
   next?: { revalidate?: number | false; tags?: string[] };
 };
 
-const DEFAULT_SERVER_ORIGIN = 'http://127.0.0.1:6000';
+/** SSR / server fetch fallback：与 web/next.config.ts 中 API_PROXY_TARGET 默认端口一致 */
+const DEFAULT_SERVER_ORIGIN = 'http://127.0.0.1:3080';
 const BROWSER_API_BASE = process.env.NEXT_PUBLIC_API_URL
   ? `${process.env.NEXT_PUBLIC_API_URL}/v1`
   : '/api/v1';

@@ -68,9 +68,13 @@ export default function IntelligencePage() {
         setStats(res.data.stats);
         setCursor(res.data.cursor);
         setHasMore(res.data.has_more);
+      } else if (!res.success && res.error?.message) {
+        setError(res.error.message);
+      } else if (!res.success) {
+        setError('接口返回失败，请稍后重试。');
       }
     } catch {
-      setError('Unable to connect to backend. Make sure the server is running on port 6000.');
+      setError('无法连接 API（请确认站点 /api 代理与后端已启动，或与管理员检查部署）。');
     } finally {
       setLoading(false);
     }
