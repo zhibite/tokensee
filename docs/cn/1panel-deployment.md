@@ -248,35 +248,51 @@ npm run migrate
 npm run build
 ```
 
-创建 PM2 配置文件 `/opt/tokensee/ecosystem.config.js`：
+创建 PM2 配置文件 `/opt/tokensee/tokensee-api.cjs`（注意后缀必须是 `.cjs`，因为项目 `package.json` 声明了 `"type": "module"`，普通 `.js` 会被当作 ESM，导致 `module.exports` 报错）：
 
-```javascript
+```bash
+cd /opt/tokensee
+set -a && source .env.production && set +a
+
+cat > tokensee-api.cjs << 'EOF'
 module.exports = {
-  apps: [
-    {
-      name: 'tokensee-api',
-      script: 'dist/index.js',
-      cwd: '/opt/tokensee',
-      instances: 1,
-      exec_mode: 'fork',
-      env_production: {
-        NODE_ENV: 'production',
-      },
-      max_memory_restart: '1G',
-      log_date_format: 'YYYY-MM-DD HH:mm:ss',
-      error_file: '/var/log/tokensee/error.log',
-      out_file: '/var/log/tokensee/out.log',
+  apps: [{
+    name: 'tokensee-api',
+    script: 'dist/index.js',
+    cwd: '/opt/tokensee',
+    instances: 1,
+    exec_mode: 'fork',
+    env_production: {
+      NODE_ENV: 'production',
+      PORT: ${PORT:-8080},
+      DATABASE_URL: '${DATABASE_URL}',
+      REDIS_URL: '${REDIS_URL}',
+      ALCHEMY_API_KEY: '${ALCHEMY_API_KEY:-}',
+      API_KEY_SALT: '${API_KEY_SALT}',
+      FRONTEND_URL: '${FRONTEND_URL}',
+      WHALE_USD_THRESHOLD: ${WHALE_USD_THRESHOLD:-1000000},
+      ALLOW_PRIVATE_WEBHOOK_URLS: ${ALLOW_PRIVATE_WEBHOOK_URLS:-false},
     },
-  ],
+    env: {
+      NODE_ENV: 'development',
+    },
+    max_memory_restart: '1G',
+    log_date_format: 'YYYY-MM-DD HH:mm:ss',
+    error_file: '/var/log/tokensee/error.log',
+    out_file: '/var/log/tokensee/out.log',
+  }],
 };
+EOF
 ```
+
+> **重要**：必须先 `source .env.production` 再生成文件，否则变量是空的。`env_production` 里的所有变量都会在 `pm2 start --env production` 时注入到进程中。
 
 ```bash
 # 创建日志目录
 mkdir -p /var/log/tokensee
 
-# 启动后端
-pm2 start ecosystem.config.js --env production
+# 启动
+pm2 start tokensee-api.cjs --env production
 
 # 保存进程列表
 pm2 save
@@ -303,35 +319,39 @@ export API_PROXY_TARGET=http://127.0.0.1:8080
 npm run build
 ```
 
-创建前端 PM2 配置：
+创建前端 PM2 配置（从 `.env.production` 读取变量）：
 
 ```bash
-# 在项目根目录创建/更新 ecosystem.config.js
-cat > /opt/tokensee/ecosystem_frontend.config.js << 'EOF'
+cd /opt/tokensee
+set -a && source .env.production && set +a
+
+cat > tokensee-web.cjs << 'EOF'
 module.exports = {
-  apps: [
-    {
-      name: 'tokensee-web',
-      script: 'node_modules/.bin/next',
-      args: 'start --port 8081',
-      cwd: '/opt/tokensee/web',
-      instances: 1,
-      exec_mode: 'fork',
-      env_production: {
-        NODE_ENV: 'production',
-        API_PROXY_TARGET: 'http://127.0.0.1:8080',
-      },
-      max_memory_restart: '500M',
-      log_date_format: 'YYYY-MM-DD HH:mm:ss',
-      error_file: '/var/log/tokensee/web-error.log',
-      out_file: '/var/log/tokensee/web-out.log',
+  apps: [{
+    name: 'tokensee-web',
+    script: 'node_modules/.bin/next',
+    args: 'start --port 8081',
+    cwd: '/opt/tokensee/web',
+    instances: 1,
+    exec_mode: 'fork',
+    env_production: {
+      NODE_ENV: 'production',
+      API_PROXY_TARGET: 'http://127.0.0.1:8080',
+      FRONTEND_URL: '${FRONTEND_URL}',
     },
-  ],
+    env: {
+      NODE_ENV: 'development',
+    },
+    max_memory_restart: '500M',
+    log_date_format: 'YYYY-MM-DD HH:mm:ss',
+    error_file: '/var/log/tokensee/web-error.log',
+    out_file: '/var/log/tokensee/web-out.log',
+  }],
 };
 EOF
 
-# 启动前端
-pm2 start /opt/tokensee/ecosystem_frontend.config.js --env production
+# 启动
+pm2 start tokensee-web.cjs --env production
 pm2 save
 ```
 
@@ -459,14 +479,23 @@ pm2 restart tokensee-web
 # ── 代码更新部署 ─────────────────────
 cd /opt/tokensee
 git pull   # 或重新上传代码包
+
+# 清理旧进程和配置文件
+pm2 delete ecosystem.api 2>/dev/null || true
+pm2 delete ecosystem.web 2>/dev/null || true
+pm2 delete tokensee-api 2>/dev/null || true
+pm2 delete tokensee-web 2>/dev/null || true
+rm -f tokensee-api.cjs tokensee-web.cjs ecosystem.api.js ecosystem.web.js
+
+set -a && source .env.production && set +a
 npm install
 npm run build
-pm2 restart tokensee-api
+pm2 start tokensee-api.cjs --env production
 
 cd web
 npm install
 npm run build
-pm2 restart tokensee-web
+pm2 start tokensee-web.cjs --env production
 
 # ── 监控面板 ────────────────────────
 pm2 monit

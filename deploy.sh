@@ -120,6 +120,23 @@ separator "第二步：拉取代码"
 if [[ -d "$INSTALL_DIR/.git" ]]; then
   log_warn "目录已存在，进入更新模式"
   cd "$INSTALL_DIR"
+
+  # 处理冲突文件：本地有但远程没有的（除了 .env.production）
+  log_info "检查是否有冲突文件..."
+  CONFLICT_FILES=$(git status --porcelain | grep -E '^\?\?' | awk '{print $2}' | grep -v '\.env\.production' | grep -v '\.gitignore' || true)
+
+  if [[ -n "$CONFLICT_FILES" ]]; then
+    log_warn "发现本地新增文件，会被远程覆盖:"
+    echo "$CONFLICT_FILES"
+    while true; do
+      read -p "是否删除这些冲突文件后继续？[y/N]: " yn
+      case $yn in
+        [Yy]* ) echo "$CONFLICT_FILES" | xargs rm -f; log_info "冲突文件已删除"; break;;
+        * )     log_error "请手动处理后重新运行脚本"; exit 1;;
+      esac
+    done
+  fi
+
   if [[ -n "$GH_TOKEN" ]]; then
     git remote set-url origin "https://$GH_TOKEN@github.com/zhibite/tokensee.git"
   fi
@@ -283,17 +300,48 @@ separator "第九步：构建并启动后端"
 log_info "编译 TypeScript..."
 npm run build --prefix "$INSTALL_DIR" 2>&1 | tail -5
 
+log_info "清理旧 PM2 进程和配置文件..."
+pm2 delete tokensee-api 2>/dev/null || true
+pm2 delete tokensee-web 2>/dev/null || true
+pm2 delete ecosystem.api 2>/dev/null || true
+pm2 delete ecosystem.web 2>/dev/null || true
+rm -f "$INSTALL_DIR"/ecosystem.api.js "$INSTALL_DIR"/ecosystem.web.js \
+      "$INSTALL_DIR"/ecosystem.api.cjs "$INSTALL_DIR"/ecosystem.web.cjs \
+      "$INSTALL_DIR"/tokensee-api.js "$INSTALL_DIR"/tokensee-web.js 2>/dev/null || true
+
 log_info "创建 PM2 进程配置..."
-cat > "$INSTALL_DIR/ecosystem.api.js" << 'PM2EOF'
+mkdir -p /var/log/tokensee
+
+# 从 .env.production 读取变量并注入到 PM2
+load_env_vars() {
+  set -a
+  source "$INSTALL_DIR/.env.production"
+  set +a
+}
+load_env_vars
+
+# 生成 PM2 API 配置（核心修复：把 .env.production 的变量全部注入 env_production）
+cat > "$INSTALL_DIR/tokensee-api.cjs" << EOF
 module.exports = {
   apps: [{
     name: 'tokensee-api',
     script: 'dist/index.js',
-    cwd: 'PM2DIR_PLACEHOLDER',
+    cwd: '$INSTALL_DIR',
     instances: 1,
     exec_mode: 'fork',
     env_production: {
       NODE_ENV: 'production',
+      PORT: ${PORT:-8080},
+      DATABASE_URL: '${DATABASE_URL}',
+      REDIS_URL: '${REDIS_URL}',
+      ALCHEMY_API_KEY: '${ALCHEMY_API_KEY:-}',
+      API_KEY_SALT: '${API_KEY_SALT}',
+      FRONTEND_URL: '${FRONTEND_URL}',
+      WHALE_USD_THRESHOLD: ${WHALE_USD_THRESHOLD:-1000000},
+      ALLOW_PRIVATE_WEBHOOK_URLS: ${ALLOW_PRIVATE_WEBHOOK_URLS:-false},
+    },
+    env: {
+      NODE_ENV: 'development',
     },
     max_memory_restart: '1G',
     log_date_format: 'YYYY-MM-DD HH:mm:ss',
@@ -302,27 +350,15 @@ module.exports = {
     time: true,
   }]
 };
-PM2EOF
+EOF
 
-sed -i "s|PM2DIR_PLACEHOLDER|$INSTALL_DIR|g" "$INSTALL_DIR/ecosystem.api.js"
-
-mkdir -p /var/log/tokensee
-
-if pm2 list | grep -q "tokensee-api"; then
-  log_info "重启 tokensee-api..."
-  pm2 restart tokensee-api --env production
-else
-  log_info "启动 tokensee-api..."
-  pm2 start "$INSTALL_DIR/ecosystem.api.js" --env production
-fi
+log_info "启动 tokensee-api..."
+pm2 start "$INSTALL_DIR/tokensee-api.cjs" --env production
 pm2 save
 
 log_ok "后端已启动"
 sleep 2
 curl -s http://127.0.0.1:8080/health | head -1 && log_ok "后端健康检查通过" || log_warn "后端健康检查未通过，请检查日志"
-
-# ── 第十步：安装前端依赖 ───────────────────────────────────
-separator "第十步：构建前端"
 
 cd "$INSTALL_DIR/web"
 log_info "安装前端 npm 依赖..."
@@ -331,18 +367,23 @@ npm install 2>&1 | tail -3
 log_info "构建前端..."
 API_PROXY_TARGET=http://127.0.0.1:8080 npm run build 2>&1 | tail -10
 
-cat > "$INSTALL_DIR/ecosystem.web.js" << 'PM2WEBEOF'
+# 生成 PM2 Web 配置（核心修复：把 .env.production 的变量全部注入 env_production）
+cat > "$INSTALL_DIR/tokensee-web.cjs" << EOF
 module.exports = {
   apps: [{
     name: 'tokensee-web',
     script: 'node_modules/.bin/next',
     args: 'start --port 8081',
-    cwd: 'WEBDIR_PLACEHOLDER',
+    cwd: '$INSTALL_DIR/web',
     instances: 1,
     exec_mode: 'fork',
     env_production: {
       NODE_ENV: 'production',
       API_PROXY_TARGET: 'http://127.0.0.1:8080',
+      FRONTEND_URL: '${FRONTEND_URL}',
+    },
+    env: {
+      NODE_ENV: 'development',
     },
     max_memory_restart: '500M',
     log_date_format: 'YYYY-MM-DD HH:mm:ss',
@@ -351,17 +392,10 @@ module.exports = {
     time: true,
   }]
 };
-PM2WEBEOF
+EOF
 
-sed -i "s|WEBDIR_PLACEHOLDER|$INSTALL_DIR/web|g" "$INSTALL_DIR/ecosystem.web.js"
-
-if pm2 list | grep -q "tokensee-web"; then
-  log_info "重启 tokensee-web..."
-  pm2 restart tokensee-web --env production
-else
-  log_info "启动 tokensee-web..."
-  pm2 start "$INSTALL_DIR/ecosystem.web.js" --env production
-fi
+log_info "启动 tokensee-web..."
+pm2 start "$INSTALL_DIR/tokensee-web.cjs" --env production
 pm2 save
 
 log_ok "前端已启动"
