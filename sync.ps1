@@ -65,8 +65,8 @@ function Push-Code {
     $status | ForEach-Object { Write-Host "  $_" -ForegroundColor DarkGray }
 
     # 检查远程分支
-    $currentBranch = git branch --show-current
-    if (-not $currentBranch) { $currentBranch = "main" }
+    $currentBranch = (git branch --show-current 2>$null)
+    if (-not $currentBranch) { $currentBranch = "master" }
 
     Write-Info "当前分支: $currentBranch"
 

@@ -29,11 +29,16 @@ CONFIG_FILE="$INSTALL_DIR/.deploy-config.env"
 git_pull() {
   info "拉取最新代码..."
   cd "$INSTALL_DIR"
+
+  # 检测当前分支（避免服务器是 master 而非 main）
+  CURRENT_BRANCH=$(git branch --show-current 2>/dev/null || echo "master")
+  info "当前分支: $CURRENT_BRANCH"
+
   git stash push -m "sync-$(date +%Y%m%d%H%M%S)-auto" -- .env .env.production .deploy-config.env 2>/dev/null || true
-  git pull origin main --rebase || {
+  git pull origin "$CURRENT_BRANCH" --rebase || {
     warn "pull 失败，尝试强制更新..."
-    git fetch origin main
-    git reset --hard "origin/main"
+    git fetch origin "$CURRENT_BRANCH"
+    git reset --hard "origin/$CURRENT_BRANCH"
   }
   # 恢复生产环境变量（不覆盖新代码中的默认值）
   if [[ -f "$INSTALL_DIR/.deploy-config.env" ]]; then
