@@ -16,6 +16,7 @@ const envSchema = z.object({
 
   // RPC Providers
   ALCHEMY_API_KEY: z.string().min(1),
+  DRPC_API_KEY: z.string().optional(),
   QUICKNODE_ETH_URL: z.string().url().optional().or(z.literal('')),
   QUICKNODE_BSC_URL: z.string().url().optional().or(z.literal('')),
   ALCHEMY_ARBITRUM_URL: z.string().url().optional().or(z.literal('')),

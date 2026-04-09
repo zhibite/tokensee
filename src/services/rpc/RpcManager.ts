@@ -45,73 +45,60 @@ let clients: Map<SupportedChain, ChainClients> | null = null;
  * matters most and there are no free alternatives.
  */
 
-// Public RPC endpoints (free, no API key required)
-// Using drpc.org and blockpi as they support most EVM chains with free tier
+// Public RPC endpoints using drpc.org (free tier, supports most EVM chains)
+// Register at https://drpc.org to get your free API key
+// Format: https://lb.drpc.org/ogrpc?network=<CHAIN>&dkey=<YOUR_KEY>
+// The API key is read from env.DRPC_API_KEY
+const DRPC_KEY = (() => {
+  const key = process.env.DRPC_API_KEY;
+  if (!key) {
+    console.warn('[RpcManager] DRPC_API_KEY not set — using fallback RPCs without auth');
+    return '';
+  }
+  return key;
+})();
+
+function drpcUrl(network: string): { primary: string; fallback: string } {
+  const fallbackMap: Record<string, string> = {
+    bsc:       'https://bsc-dataseed2.binance.org',
+    arbitrum:  'https://arb1.arbitrum.io/rpc',
+    polygon:   'https://polygon.llamarpc.com',
+    base:      'https://mainnet.base.org',
+    optimism:  'https://mainnet.optimism.io',
+    avalanche: 'https://avalanche.drpc.org',
+    zksync:    'https://mainnet.era.zksync.io',
+    linea:     'https://rpc.linea.build',
+    scroll:    'https://rpc.scroll.io',
+    zkevm:     'https://zkevm-rpc.com',
+    mantle:    'https://rpc.mantle.xyz',
+    gnosis:    'https://rpc.gnosischain.com',
+    metis:     'https://andromeda.metis.io/?owner=1088',
+    boba:      'https://mainnet.boba.network',
+    blast:     'https://blast.blockpi.network/rpc/v1/public',
+    mode:      'https://mainnet.mode.network',
+  };
+  const fallback = fallbackMap[network] ?? `https://lb.drpc.org/ogrpc?network=${network}&dkey=${DRPC_KEY}`;
+  if (!DRPC_KEY) return { primary: fallback, fallback };
+  return { primary: `https://lb.drpc.org/ogrpc?network=${network}&dkey=${DRPC_KEY}`, fallback };
+}
+
 const PUBLIC_RPCS: Record<string, { primary: string; fallback: string }> = {
-  bsc: {
-    primary:   'https://lb.drpc.org/ogrpc?network=bsc&dkey=A9I6rTg7x8vK2nP4mQ9sL3jF5eH7cR1h',
-    fallback:  'https://bsc-dataseed2.binance.org',
-  },
-  arbitrum: {
-    primary:   'https://lb.drpc.org/ogrpc?network=arbitrum&dkey=A9I6rTg7x8vK2nP4mQ9sL3jF5eH7cR1h',
-    fallback:  'https://arb1.arbitrum.io/rpc',
-  },
-  polygon: {
-    primary:   'https://lb.drpc.org/ogrpc?network=matic&dkey=A9I6rTg7x8vK2nP4mQ9sL3jF5eH7cR1h',
-    fallback:  'https://polygon.llamarpc.com',
-  },
-  base: {
-    primary:   'https://lb.drpc.org/ogrpc?network=base&dkey=A9I6rTg7x8vK2nP4mQ9sL3jF5eH7cR1h',
-    fallback:  'https://mainnet.base.org',
-  },
-  optimism: {
-    primary:   'https://lb.drpc.org/ogrpc?network=optimism&dkey=A9I6rTg7x8vK2nP4mQ9sL3jF5eH7cR1h',
-    fallback:  'https://mainnet.optimism.io',
-  },
-  avalanche: {
-    primary:   'https://lb.drpc.org/ogrpc?network=avalanche&dkey=A9I6rTg7x8vK2nP4mQ9sL3jF5eH7cR1h',
-    fallback:  'https://avalanche.drpc.org',
-  },
-  zksync: {
-    primary:   'https://lb.drpc.org/ogrpc?network=zksync&dkey=A9I6rTg7x8vK2nP4mQ9sL3jF5eH7cR1h',
-    fallback:  'https://mainnet.era.zksync.io',
-  },
-  linea: {
-    primary:   'https://lb.drpc.org/ogrpc?network=linea&dkey=A9I6rTg7x8vK2nP4mQ9sL3jF5eH7cR1h',
-    fallback:  'https://rpc.linea.build',
-  },
-  scroll: {
-    primary:   'https://lb.drpc.org/ogrpc?network=scroll&dkey=A9I6rTg7x8vK2nP4mQ9sL3jF5eH7cR1h',
-    fallback:  'https://rpc.scroll.io',
-  },
-  zkevm: {
-    primary:   'https://lb.drpc.org/ogrpc?network=polygonzkevm&dkey=A9I6rTg7x8vK2nP4mQ9sL3jF5eH7cR1h',
-    fallback:  'https://zkevm-rpc.com',
-  },
-  mantle: {
-    primary:   'https://lb.drpc.org/ogrpc?network=mantle&dkey=A9I6rTg7x8vK2nP4mQ9sL3jF5eH7cR1h',
-    fallback:  'https://rpc.mantle.xyz',
-  },
-  gnosis: {
-    primary:   'https://lb.drpc.org/ogrpc?network=gnosis&dkey=A9I6rTg7x8vK2nP4mQ9sL3jF5eH7cR1h',
-    fallback:  'https://rpc.gnosischain.com',
-  },
-  metis: {
-    primary:   'https://andromeda.metis.io/?owner=1088',
-    fallback:  'https://metis-mainnet.public.blastapi.io',
-  },
-  boba: {
-    primary:   'https://lb.drpc.org/ogrpc?network=boba&dkey=A9I6rTg7x8vK2nP4mQ9sL3jF5eH7cR1h',
-    fallback:  'https://mainnet.boba.network',
-  },
-  blast: {
-    primary:   'https://lb.drpc.org/ogrpc?network=blast&dkey=A9I6rTg7x8vK2nP4mQ9sL3jF5eH7cR1h',
-    fallback:  'https://blast.blockpi.network/rpc/v1/public',
-  },
-  mode: {
-    primary:   'https://lb.drpc.org/ogrpc?network=mode&dkey=A9I6rTg7x8vK2nP4mQ9sL3jF5eH7cR1h',
-    fallback:  'https://mainnet.mode.network',
-  },
+  bsc:       drpcUrl('bsc'),
+  arbitrum:  drpcUrl('arbitrum'),
+  polygon:   drpcUrl('matic'),
+  base:      drpcUrl('base'),
+  optimism:  drpcUrl('optimism'),
+  avalanche: drpcUrl('avalanche'),
+  zksync:    drpcUrl('zksync'),
+  linea:     drpcUrl('linea'),
+  scroll:    drpcUrl('scroll'),
+  zkevm:     drpcUrl('polygonzkevm'),
+  mantle:    drpcUrl('mantle'),
+  gnosis:    drpcUrl('gnosis'),
+  metis:     drpcUrl('andromeda'),
+  boba:      drpcUrl('boba'),
+  blast:     drpcUrl('blast'),
+  mode:      drpcUrl('mode'),
 };
 
 function buildClients(): Map<SupportedChain, ChainClients> {
