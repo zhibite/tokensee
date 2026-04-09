@@ -1,0 +1,1 @@
+feat: multi-chain support for WhaleMonitor and SmartMoney

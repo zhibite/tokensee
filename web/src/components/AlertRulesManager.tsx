@@ -8,7 +8,10 @@ const ALERT_TYPE_OPTIONS = [
   'large_transfer', 'exchange_inflow', 'exchange_outflow',
   'whale_movement', 'bridge_deposit', 'bridge_withdrawal',
 ];
-const CHAIN_OPTIONS = ['ethereum', 'bsc', 'arbitrum', 'polygon', 'base', 'optimism', 'avalanche'];
+const CHAIN_OPTIONS = [
+  'ethereum', 'bsc', 'arbitrum', 'polygon', 'base', 'optimism', 'avalanche',
+  'zksync', 'linea', 'scroll', 'zkevm', 'mantle', 'gnosis', 'metis', 'boba', 'blast', 'mode',
+];
 const ASSET_OPTIONS = ['ETH', 'BTC', 'USDC', 'USDT', 'DAI', 'WBTC', 'BNB', 'MATIC', 'AVAX'];
 
 function formatUsd(n?: number) {

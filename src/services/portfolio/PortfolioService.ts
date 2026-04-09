@@ -89,6 +89,16 @@ export class PortfolioService {
       base:      { symbol: 'ETH',   name: 'Ethereum' },
       optimism:  { symbol: 'ETH',   name: 'Ethereum' },
       avalanche: { symbol: 'AVAX',  name: 'Avalanche' },
+      zksync:    { symbol: 'ETH',   name: 'Ethereum' },
+      linea:     { symbol: 'ETH',   name: 'Ethereum' },
+      scroll:    { symbol: 'ETH',   name: 'Ethereum' },
+      zkevm:     { symbol: 'ETH',   name: 'Ethereum' },
+      mantle:    { symbol: 'MNT',   name: 'Mantle' },
+      gnosis:    { symbol: 'xDAI',  name: 'Gnosis' },
+      metis:     { symbol: 'METIS', name: 'Metis' },
+      boba:      { symbol: 'ETH',   name: 'Ethereum' },
+      blast:     { symbol: 'ETH',   name: 'Ethereum' },
+      mode:      { symbol: 'ETH',   name: 'Ethereum' },
     };
     const { symbol, name } = NATIVE[chain];
     const balance = formatUnits(balanceWei, 18);

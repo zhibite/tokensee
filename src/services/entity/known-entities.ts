@@ -17,7 +17,7 @@ export type EntityType =
 
 export interface KnownEntity {
   address: string;
-  chain: 'ethereum' | 'bsc' | 'multi';
+  chain: 'ethereum' | 'bsc' | 'arbitrum' | 'polygon' | 'base' | 'optimism' | 'avalanche' | 'zksync' | 'linea' | 'scroll' | 'zkevm' | 'mantle' | 'gnosis' | 'metis' | 'boba' | 'blast' | 'mode' | 'multi';
   label: string;
   entity_name: string;
   entity_type: EntityType;

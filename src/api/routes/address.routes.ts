@@ -11,6 +11,7 @@ export const addressRoutes = Router();
 
 const SUPPORTED_CHAINS: SupportedChain[] = [
   'ethereum', 'bsc', 'arbitrum', 'polygon', 'base', 'optimism', 'avalanche',
+  'zksync', 'linea', 'scroll', 'zkevm', 'mantle', 'gnosis', 'metis', 'boba', 'blast', 'mode',
 ];
 
 // GET /v1/address/:address/entity?chain=ethereum

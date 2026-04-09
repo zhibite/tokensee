@@ -9,7 +9,10 @@ import type { ApiError } from '../../types/transaction.types.js';
 
 export const accountRoutes = Router();
 
-const SUPPORTED_CHAINS: SupportedChain[] = ['ethereum', 'bsc', 'arbitrum', 'polygon', 'base', 'optimism', 'avalanche'];
+const SUPPORTED_CHAINS: SupportedChain[] = [
+  'ethereum', 'bsc', 'arbitrum', 'polygon', 'base', 'optimism', 'avalanche',
+  'zksync', 'linea', 'scroll', 'zkevm', 'mantle', 'gnosis', 'metis', 'boba', 'blast', 'mode',
+];
 
 // GET /v1/account/:address/activity?chain=&limit=&cursor=
 accountRoutes.get('/:address/activity', async (req: Request, res: Response) => {

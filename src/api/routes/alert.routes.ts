@@ -66,7 +66,10 @@ alertRoutes.get('/', async (req: Request, res: Response) => {
   const cursor    = req.query.cursor ? BigInt(req.query.cursor as string) : null;
 
   const VALID_TYPES = ['large_transfer','exchange_inflow','exchange_outflow','whale_movement','bridge_deposit','bridge_withdrawal'];
-  const VALID_CHAINS = ['ethereum','bsc','arbitrum','polygon','base','optimism','avalanche'];
+  const VALID_CHAINS = [
+    'ethereum','bsc','arbitrum','polygon','base','optimism','avalanche',
+    'zksync','linea','scroll','zkevm','mantle','gnosis','metis','boba','blast','mode',
+  ];
 
   if (chain && !VALID_CHAINS.includes(chain)) {
     const error: ApiError = { success: false, error: { code: 'INVALID_CHAIN', message: `chain must be one of: ${VALID_CHAINS.join(', ')}` } };

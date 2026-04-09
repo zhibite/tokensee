@@ -31,13 +31,23 @@ const ALERT_TYPE_LABELS: Record<string, string> = {
 };
 
 const CHAIN_COLORS: Record<string, string> = {
-  ethereum: 'text-blue-400',
-  bsc:      'text-yellow-400',
-  arbitrum: 'text-orange-400',
-  polygon:  'text-purple-400',
-  base:     'text-blue-300',
-  optimism: 'text-red-400',
-  avalanche:'text-red-500',
+  ethereum:  'text-blue-400',
+  bsc:       'text-yellow-400',
+  arbitrum:  'text-orange-400',
+  polygon:   'text-purple-400',
+  base:      'text-blue-300',
+  optimism:  'text-red-400',
+  avalanche: 'text-red-500',
+  zksync:   'text-indigo-400',
+  linea:    'text-violet-400',
+  scroll:    'text-amber-300',
+  zkevm:    'text-purple-300',
+  mantle:   'text-teal-400',
+  gnosis:   'text-cyan-400',
+  metis:    'text-sky-400',
+  boba:     'text-blue-200',
+  blast:    'text-yellow-300',
+  mode:     'text-indigo-300',
 };
 
 function formatUsd(n: number | null) {
@@ -57,7 +67,11 @@ function timeAgo(ts: number) {
 }
 
 const ALL_CATEGORIES: Array<SmartMoneyCategory | 'all'> = ['all', 'vc', 'quant', 'market_maker', 'whale', 'dao_treasury'];
-const ALL_CHAINS = ['all', 'ethereum', 'bsc', 'arbitrum', 'polygon', 'base', 'optimism', 'avalanche'];
+const ALL_CHAINS = [
+  'all',
+  'ethereum', 'bsc', 'arbitrum', 'polygon', 'base', 'optimism', 'avalanche',
+  'zksync', 'linea', 'scroll', 'zkevm', 'mantle', 'gnosis', 'metis', 'boba', 'blast', 'mode',
+];
 
 export function SmartMoneyFeed() {
   const [moves, setMoves]         = useState<SmartMoneyMove[]>([]);

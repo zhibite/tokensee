@@ -11,6 +11,7 @@ const ALL_EVENTS = [
 
 const ALL_CHAINS = [
   'ethereum', 'bsc', 'arbitrum', 'polygon', 'base', 'optimism', 'avalanche',
+  'zksync', 'linea', 'scroll', 'zkevm', 'mantle', 'gnosis', 'metis', 'boba', 'blast', 'mode',
 ];
 
 const EVENT_LABELS: Record<string, string> = {

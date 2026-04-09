@@ -56,6 +56,15 @@ build_api() {
     return 1
   fi
   ok "后端编译完成"
+
+  # 数据库迁移（如表缺失则自动创建）
+  info "运行数据库迁移..."
+  cd "$INSTALL_DIR"
+  if npm run migrate 2>&1 | tail -15; then
+    ok "数据库迁移完成"
+  else
+    warn "迁移失败（表可能已存在）"
+  fi
 }
 
 # ── 编译前端 ─────────────────────────────────────────

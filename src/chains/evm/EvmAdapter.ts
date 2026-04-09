@@ -12,11 +12,23 @@ import { CacheService, CACHE_KEYS, TTL } from '../../services/cache/CacheService
 import { NATIVE_TOKEN_ADDRESS } from '../../config/chains.config.js';
 
 const NATIVE_INFO: Record<string, { symbol: string; name: string }> = {
+  ethereum:  { symbol: 'ETH',  name: 'Ethereum' },
+  bsc:       { symbol: 'BNB',  name: 'BNB Chain' },
   arbitrum:  { symbol: 'ETH',  name: 'Ethereum' },
   polygon:   { symbol: 'MATIC', name: 'Polygon' },
   base:      { symbol: 'ETH',  name: 'Ethereum' },
   optimism:  { symbol: 'ETH',  name: 'Ethereum' },
   avalanche: { symbol: 'AVAX', name: 'Avalanche' },
+  zksync:    { symbol: 'ETH',  name: 'Ethereum' },
+  linea:     { symbol: 'ETH',  name: 'Ethereum' },
+  scroll:    { symbol: 'ETH',  name: 'Ethereum' },
+  zkevm:     { symbol: 'ETH',  name: 'Ethereum' },
+  mantle:    { symbol: 'MNT',  name: 'Mantle' },
+  gnosis:    { symbol: 'xDAI', name: 'Gnosis' },
+  metis:     { symbol: 'METIS', name: 'Metis' },
+  boba:      { symbol: 'ETH',  name: 'Ethereum' },
+  blast:     { symbol: 'ETH',  name: 'Ethereum' },
+  mode:      { symbol: 'ETH',  name: 'Ethereum' },
 };
 
 export class EvmAdapter implements IChainAdapter {

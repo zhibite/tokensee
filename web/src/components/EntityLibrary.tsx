@@ -11,7 +11,10 @@ const ENTITY_TYPES = [
   'exchange', 'protocol', 'bridge', 'fund', 'institution', 'kol',
   'hacker', 'sanctioned', 'miner', 'token', 'whale', 'mixer', 'nft', 'stablecoin', 'oracle', 'dao', 'other',
 ];
-const CHAINS       = ['ethereum', 'bsc', 'arbitrum', 'polygon', 'base', 'optimism', 'avalanche', 'multi'];
+const CHAINS       = [
+  'ethereum', 'bsc', 'arbitrum', 'polygon', 'base', 'optimism', 'avalanche',
+  'zksync', 'linea', 'scroll', 'zkevm', 'mantle', 'gnosis', 'metis', 'boba', 'blast', 'mode', 'multi',
+];
 
 const TYPE_COLOR: Record<string, string> = {
   exchange:    'bg-yellow-500/15 text-yellow-400 border-yellow-500/30',

@@ -12,13 +12,23 @@ import type { IChainAdapter } from '../../../chains/base/ChainAdapter.interface.
 import type { SupportedChain } from '../../../types/chain.types.js';
 
 const adapterMap: Record<SupportedChain, IChainAdapter> = {
-  ethereum: new EthereumAdapter(),
-  bsc:      new BscAdapter(),
+  ethereum:  new EthereumAdapter(),
+  bsc:       new BscAdapter(),
   arbitrum:  new EvmAdapter('arbitrum',  42161),
   polygon:   new EvmAdapter('polygon',   137),
   base:      new EvmAdapter('base',      8453),
   optimism:  new EvmAdapter('optimism',  10),
   avalanche: new EvmAdapter('avalanche', 43114),
+  zksync:    new EvmAdapter('zksync',     324),
+  linea:     new EvmAdapter('linea',     59144),
+  scroll:    new EvmAdapter('scroll',    534352),
+  zkevm:     new EvmAdapter('zkevm',    1101),
+  mantle:    new EvmAdapter('mantle',    5000),
+  gnosis:    new EvmAdapter('gnosis',     100),
+  metis:     new EvmAdapter('metis',     1088),
+  boba:      new EvmAdapter('boba',      288),
+  blast:     new EvmAdapter('blast',     81457),
+  mode:      new EvmAdapter('mode',      34443),
 };
 
 const NATIVE_SYMBOL: Record<SupportedChain, string> = {
@@ -29,6 +39,16 @@ const NATIVE_SYMBOL: Record<SupportedChain, string> = {
   base:      'ETH',
   optimism:  'ETH',
   avalanche: 'AVAX',
+  zksync:    'ETH',
+  linea:     'ETH',
+  scroll:    'ETH',
+  zkevm:     'ETH',
+  mantle:    'MNT',
+  gnosis:    'xDAI',
+  metis:     'METIS',
+  boba:      'ETH',
+  blast:     'ETH',
+  mode:      'ETH',
 };
 
 export class SemanticStep implements PipelineStep {

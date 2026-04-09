@@ -6,7 +6,10 @@ export const txDecodeSchema = z.object({
   hash: z
     .string()
     .regex(/^0x[0-9a-fA-F]{64}$/, 'Invalid transaction hash — must be 0x followed by 64 hex chars'),
-  chain: z.enum(['ethereum', 'bsc', 'arbitrum', 'polygon', 'base', 'optimism', 'avalanche'] as [string, ...string[]]).transform((v) => v as 'ethereum' | 'bsc' | 'arbitrum' | 'polygon' | 'base' | 'optimism' | 'avalanche'),
+  chain: z.enum([
+    'ethereum', 'bsc', 'arbitrum', 'polygon', 'base', 'optimism', 'avalanche',
+    'zksync', 'linea', 'scroll', 'zkevm', 'mantle', 'gnosis', 'metis', 'boba', 'blast', 'mode',
+  ] as [string, ...string[]]).transform((v) => v as 'ethereum' | 'bsc' | 'arbitrum' | 'polygon' | 'base' | 'optimism' | 'avalanche' | 'zksync' | 'linea' | 'scroll' | 'zkevm' | 'mantle' | 'gnosis' | 'metis' | 'boba' | 'blast' | 'mode'),
 });
 
 export function validateBody<T extends z.ZodSchema>(schema: T) {

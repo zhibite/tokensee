@@ -1,4 +1,21 @@
-export type SupportedChain = 'ethereum' | 'bsc' | 'arbitrum' | 'polygon' | 'base' | 'optimism' | 'avalanche';
+export type SupportedChain =
+  | 'ethereum'
+  | 'bsc'
+  | 'arbitrum'
+  | 'polygon'
+  | 'base'
+  | 'optimism'
+  | 'avalanche'
+  | 'zksync'
+  | 'linea'
+  | 'scroll'
+  | 'zkevm'
+  | 'mantle'
+  | 'gnosis'
+  | 'metis'
+  | 'boba'
+  | 'blast'
+  | 'mode';
 
 export interface ChainConfig {
   chainId: number;

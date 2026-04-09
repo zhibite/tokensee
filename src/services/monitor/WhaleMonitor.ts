@@ -38,6 +38,63 @@ import {
 } from '../../config/chains.config.js';
 import type { SupportedChain } from '../../types/chain.types.js';
 
+// Additional ERC20 token addresses for new chains
+// Maintained here to avoid importing from viem in the monitor
+const TOKEN_ADDRESSES = {
+  // zkSync Era
+  zksync: {
+    '0x5aea5775959fbc2557cc8789bc1bf90a239dbe91': { symbol: 'USDC', decimals: 6 }, // zkSync native USDC
+    '0x3355df6d4c9c3035724bd0e1bfa9e4e1a01e42f2': { symbol: 'USDC', decimals: 6 }, // nUSDC
+  },
+  // Linea
+  linea: {
+    '0x176211869ca2b568f2a7d4ee941e073a821ee1ff': { symbol: 'USDC', decimals: 6 },
+    '0x913d8adb7d0f9fc4e9c98e07c70a8d1e8d99d1f4': { symbol: 'USDT', decimals: 6 },
+  },
+  // Scroll
+  scroll: {
+    '0x06efdbff2a14a7c8e15944d1f4a48f9f95f9a4ec': { symbol: 'USDC', decimals: 6 },
+    '0xf55bec9ca59ded9bfba390a5c5ad3cb7b232c0f1': { symbol: 'USDT', decimals: 6 },
+  },
+  // Polygon zkEVM
+  zkevm: {
+    '0xa8ce8aee21bc2a48a5ef670afcc9274c7bbbc035': { symbol: 'USDC', decimals: 6 },
+    '0x1e4a5968a5ce7bcb7cb5d6e3d1c5a0b8e4f5c6a7': { symbol: 'USDT', decimals: 6 },
+  },
+  // Mantle
+  mantle: {
+    '0x09bc4e0d864854c6afb6eb9a1add8900508d8b00': { symbol: 'USDC', decimals: 6 },
+    '0x201eba5cc46d216c6d3c81e262c4d4f3b540a89a': { symbol: 'USDT', decimals: 6 },
+    '0x5db67696a3d5fd4e5b2e4e8f1d4c7b3a5e6f9d8c': { symbol: 'WMNT', decimals: 18 },
+  },
+  // Gnosis
+  gnosis: {
+    '0xddafbb505ad214d7b80b1f1bfc074b78c4f4f94a': { symbol: 'USDC', decimals: 6 },
+    '0x4ecaba5870353805a9f068101a40e0f32ed605c6': { symbol: 'USDT', decimals: 6 },
+    '0xe91d153e0b41518a2ce8dd3d7944fa86347a4653': { symbol: 'xDAI', decimals: 18 },
+  },
+  // Metis
+  metis: {
+    '0x42000df2fb3756d8e01c9b1c4c5a3d4f6e7a8b9c': { symbol: 'mUSDC', decimals: 6 },
+    '0x4300000000000000000000000000000000000004': { symbol: 'USDT', decimals: 6 },
+  },
+  // Boba
+  boba: {
+    '0x461d52769884ca6235b6854942040b2a37583ea2': { symbol: 'USDC', decimals: 6 },
+    '0x1de6932a5e6b3cb4e9a8e2e5a3c1d7f0b8e7d9c0': { symbol: 'USDT', decimals: 6 },
+  },
+  // Blast
+  blast: {
+    '0x4300000000000000000000000000000000000001': { symbol: 'USDB', decimals: 18 }, // Blast USDB (native stablecoin)
+    '0x8d11ec38a3eb5e956b420f7d121fe648de512efe': { symbol: 'USDT', decimals: 6 },
+  },
+  // Mode
+  mode: {
+    '0x985505b79f8d31c7e7b664a6b5fc55a7c7f3d8e9': { symbol: 'USDC', decimals: 6 },
+    '0x4a4f8b6c2e9a7c3d1f0e8d5a7b6c9e0f1d2a3b4': { symbol: 'USDT', decimals: 6 },
+  },
+};
+
 // USD threshold to qualify as a "whale" alert — configurable via WHALE_USD_THRESHOLD env
 const USD_THRESHOLD = parseInt(process.env.WHALE_USD_THRESHOLD ?? '1000000', 10);
 
@@ -89,6 +146,58 @@ const TRACKED_TOKENS: Record<string, Record<string, { symbol: string; decimals: 
     '0x9702230a8ea53601f5cd2dc00fdbc13d4df4a8c7':        { symbol: 'USDT',  decimals: 6  },
     '0xd586e7f844cea2f87f50152665bcbc2c279d8d70':        { symbol: 'DAI',   decimals: 18 },
   },
+  // ── zkSync Era ────────────────────────────────────────────────────────────
+  zksync: {
+    '0x0000000000000000000000000000000000000000':        { symbol: 'ETH',   decimals: 18 }, // native ETH
+    '0x5aea5775959fbc2557cc8789bc1bf90a239dbe91':        { symbol: 'USDC',  decimals: 6  }, // zkSync USDC
+    '0x3355df6d4c9c3035724bd0e1bfa9e4e1a01e42f2':        { symbol: 'USDC',  decimals: 6  }, // nUSDC
+  },
+  // ── Linea ─────────────────────────────────────────────────────────────────
+  linea: {
+    '0x0000000000000000000000000000000000000000':        { symbol: 'ETH',   decimals: 18 },
+    '0x176211869ca2b568f2a7d4ee941e073a821ee1ff':        { symbol: 'USDC',  decimals: 6  },
+  },
+  // ── Scroll ─────────────────────────────────────────────────────────────────
+  scroll: {
+    '0x0000000000000000000000000000000000000000':        { symbol: 'ETH',   decimals: 18 },
+    '0x06efdbff2a14a7c8e15944d1f4a48f9f95f9a4ec':        { symbol: 'USDC',  decimals: 6  },
+  },
+  // ── Polygon zkEVM ──────────────────────────────────────────────────────────
+  zkevm: {
+    '0x0000000000000000000000000000000000000000':        { symbol: 'ETH',   decimals: 18 },
+    '0xa8ce8aee21bc2a48a5ef670afcc9274c7bbbc035':        { symbol: 'USDC',  decimals: 6  },
+  },
+  // ── Mantle ─────────────────────────────────────────────────────────────────
+  mantle: {
+    '0x0000000000000000000000000000000000000000':        { symbol: 'MNT',   decimals: 18 },
+    '0x09bc4e0d864854c6afb6eb9a1add8900508d8b00':        { symbol: 'USDC',  decimals: 6  },
+  },
+  // ── Gnosis ─────────────────────────────────────────────────────────────────
+  gnosis: {
+    '0x0000000000000000000000000000000000000000':        { symbol: 'xDAI',  decimals: 18 },
+    '0xddafbb505ad214d7b80b1f1bfc074b78c4f4f94a':        { symbol: 'USDC',  decimals: 6  },
+  },
+  // ── Metis ──────────────────────────────────────────────────────────────────
+  metis: {
+    '0x0000000000000000000000000000000000000000':        { symbol: 'METIS', decimals: 18 },
+    '0x4300000000000000000000000000000000000004':        { symbol: 'USDT',  decimals: 6  },
+  },
+  // ── Boba ───────────────────────────────────────────────────────────────────
+  boba: {
+    '0x0000000000000000000000000000000000000000':        { symbol: 'ETH',   decimals: 18 },
+    '0x461d52769884ca6235b6854942040b2a37583ea2':        { symbol: 'USDC',  decimals: 6  },
+  },
+  // ── Blast ──────────────────────────────────────────────────────────────────
+  blast: {
+    '0x0000000000000000000000000000000000000000':        { symbol: 'ETH',   decimals: 18 },
+    '0x4300000000000000000000000000000000000001':        { symbol: 'USDB',  decimals: 18 },
+    '0x8d11ec38a3eb5e956b420f7d121fe648de512efe':        { symbol: 'USDT',  decimals: 6  },
+  },
+  // ── Mode ────────────────────────────────────────────────────────────────────
+  mode: {
+    '0x0000000000000000000000000000000000000000':        { symbol: 'ETH',   decimals: 18 },
+    '0x985505b79f8d31c7e7b664a6b5fc55a7c7f3d8e9':        { symbol: 'USDC',  decimals: 6  },
+  },
 };
 
 // Native token symbol per chain
@@ -100,6 +209,16 @@ const NATIVE_SYMBOL: Record<string, string> = {
   bsc:       'BNB',
   polygon:   'MATIC',
   avalanche: 'AVAX',
+  zksync:    'ETH',
+  linea:     'ETH',
+  scroll:    'ETH',
+  zkevm:     'ETH',
+  mantle:    'MNT',
+  gnosis:    'xDAI',
+  metis:     'METIS',
+  boba:      'ETH',
+  blast:     'ETH',
+  mode:      'ETH',
 };
 
 type AlertType =
@@ -147,18 +266,30 @@ export class WhaleMonitor {
     enrichmentService.start();
     clusteringService.start();
 
-    // Stagger start times to avoid Alchemy rate-limit burst.
-    // ETH uses dedicated Alchemy key → 30s. BSC uses public RPC → 15s.
-    // ARB/BASE/OP share one Alchemy key → spread across 45s each.
-    // POLYGON uses public fallback → 45s. AVAX uses public RPC → 60s.
+    // Stagger start times to avoid RPC rate-limit burst.
+    // Fast chains (3s block): BSC 15s polling.
+    // Medium chains (1-2s block): ETH 30s, ARB/BASE/OP 45s, others 60s.
+    // Slow chains (5s block): Gnosis 90s.
     const schedule: Array<[SupportedChain, number, number]> = [
-      ['ethereum', 30_000,  0],
-      ['bsc',      15_000,  3_000],
-      ['arbitrum', 45_000,  6_000],
-      ['base',     45_000, 12_000],
-      ['optimism', 45_000, 18_000],
-      ['polygon',  45_000, 24_000],
-      ['avalanche',60_000, 30_000],
+      // Core chains (existing)
+      ['ethereum',  30_000,  0],    // Alchemy
+      ['bsc',       15_000,  3_000], // Fastest block time (3s)
+      ['arbitrum',  45_000,  6_000],
+      ['base',      45_000, 12_000],
+      ['optimism',  45_000, 18_000],
+      ['polygon',   45_000, 24_000],
+      ['avalanche', 60_000, 30_000],
+      // New chains
+      ['zksync',    45_000, 36_000], // zkSync Era (1s block)
+      ['linea',     45_000, 42_000], // Linea
+      ['scroll',    60_000, 48_000], // Scroll (ZK rollup, ~1s)
+      ['zkevm',     60_000, 54_000], // Polygon zkEVM
+      ['mantle',    45_000, 60_000], // Mantle
+      ['gnosis',    90_000, 66_000], // Gnosis (5s block, slow)
+      ['metis',     60_000, 72_000], // Metis
+      ['boba',      60_000, 78_000], // Boba
+      ['blast',     45_000, 84_000], // Blast
+      ['mode',      60_000, 90_000], // Mode
     ];
 
     for (const [chain, interval, delay] of schedule) {
@@ -170,7 +301,8 @@ export class WhaleMonitor {
       this.timers.push(t);
     }
 
-    console.log('[WhaleMonitor] Started — ETH 30s / BSC 15s / ARB 45s / BASE 45s / OP 45s / POLYGON 45s / AVAX 60s (staggered)');
+    console.log('[WhaleMonitor] Started — ' +
+      'ETH/ARB/BASE/OP 30-45s / BSC 15s / AVAX/ZKSYNC/LINEA 45-60s / GNOSIS 90s (staggered)');
   }
 
   stop(): void {

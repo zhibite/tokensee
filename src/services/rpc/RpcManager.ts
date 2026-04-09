@@ -1,5 +1,5 @@
 import { createPublicClient, http, type PublicClient } from 'viem';
-import { mainnet, bsc, arbitrum, polygon, base, optimism, avalanche } from 'viem/chains';
+import { mainnet, bsc, arbitrum, polygon, base, optimism, avalanche, zkSync, linea, scroll, polygonZkEvm, mantle, gnosis, metis, boba, blast, mode } from 'viem/chains';
 import { env } from '../../config/index.js';
 import type { SupportedChain } from '../../types/chain.types.js';
 
@@ -45,9 +45,9 @@ let clients: Map<SupportedChain, ChainClients> | null = null;
  * matters most and there are no free alternatives.
  */
 
-// Public RPC endpoints (free, no API key required)
+// Public RPC endpoints (free, no API key required for most)
+// For Ankr: uses the Alchemy API key from env as auth token
 // Note: LlamaRPC may be blocked/unstable in China mainland.
-// Primary choices here are chosen for better availability in CN region.
 const PUBLIC_RPCS: Record<string, { primary: string; fallback: string }> = {
   bsc: {
     primary:   'https://rpc.ankr.com/bsc',
@@ -72,6 +72,46 @@ const PUBLIC_RPCS: Record<string, { primary: string; fallback: string }> = {
   avalanche: {
     primary:   'https://api.avax.network/ext/bc/C/rpc',
     fallback:  'https://avalanche.drpc.org',
+  },
+  zksync: {
+    primary:   'https://rpc.ankr.com/zksync_era',
+    fallback:  'https://mainnet.era.zksync.io',
+  },
+  linea: {
+    primary:   'https://rpc.ankr.com/linea',
+    fallback:  'https://rpc.linea.build',
+  },
+  scroll: {
+    primary:   'https://rpc.ankr.com/scroll',
+    fallback:  'https://rpc.scroll.io',
+  },
+  zkevm: {
+    primary:   'https://rpc.ankr.com/polygon_zkevm',
+    fallback:  'https://zkevm-rpc.com',
+  },
+  mantle: {
+    primary:   'https://rpc.ankr.com/mantle',
+    fallback:  'https://rpc.mantle.xyz',
+  },
+  gnosis: {
+    primary:   'https://rpc.ankr.com/gnosis',
+    fallback:  'https://rpc.gnosischain.com',
+  },
+  metis: {
+    primary:   'https://rpc.ankr.com/metis_andromeda',
+    fallback:  'https://andromeda.metis.io/?owner=1088',
+  },
+  boba: {
+    primary:   'https://rpc.ankr.com/boba_boba',
+    fallback:  'https://mainnet.boba.network',
+  },
+  blast: {
+    primary:   'https://rpc.ankr.com/blast',
+    fallback:  'https://blast.blockpi.network/rpc/v1/public',
+  },
+  mode: {
+    primary:   'https://rpc.ankr.com/mode',
+    fallback:  'https://mainnet.mode.network',
   },
 };
 
@@ -148,6 +188,66 @@ function buildClients(): Map<SupportedChain, ChainClients> {
       fallback: createPublicClient({ chain: avalanche, transport: http(avaxRpcs.fallback, { timeout: 8_000 }) }) as unknown as PublicClient,
     });
   }
+
+  // ─── zkSync Era ────────────────────────────────────────────────────────────
+  map.set('zksync', {
+    primary:  createPublicClient({ chain: zkSync, transport: http(PUBLIC_RPCS.zksync.primary, { timeout: 12_000 }) }) as unknown as PublicClient,
+    fallback: createPublicClient({ chain: zkSync, transport: http(PUBLIC_RPCS.zksync.fallback, { timeout: 12_000 }) }) as unknown as PublicClient,
+  });
+
+  // ─── Linea ────────────────────────────────────────────────────────────────
+  map.set('linea', {
+    primary:  createPublicClient({ chain: linea, transport: http(PUBLIC_RPCS.linea.primary, { timeout: 10_000 }) }) as unknown as PublicClient,
+    fallback: createPublicClient({ chain: linea, transport: http(PUBLIC_RPCS.linea.fallback, { timeout: 10_000 }) }) as unknown as PublicClient,
+  });
+
+  // ─── Scroll ───────────────────────────────────────────────────────────────
+  map.set('scroll', {
+    primary:  createPublicClient({ chain: scroll, transport: http(PUBLIC_RPCS.scroll.primary, { timeout: 10_000 }) }) as unknown as PublicClient,
+    fallback: createPublicClient({ chain: scroll, transport: http(PUBLIC_RPCS.scroll.fallback, { timeout: 10_000 }) }) as unknown as PublicClient,
+  });
+
+  // ─── Polygon zkEVM ───────────────────────────────────────────────────────
+  map.set('zkevm', {
+    primary:  createPublicClient({ chain: polygonZkEvm, transport: http(PUBLIC_RPCS.zkevm.primary, { timeout: 10_000 }) }) as unknown as PublicClient,
+    fallback: createPublicClient({ chain: polygonZkEvm, transport: http(PUBLIC_RPCS.zkevm.fallback, { timeout: 10_000 }) }) as unknown as PublicClient,
+  });
+
+  // ─── Mantle ───────────────────────────────────────────────────────────────
+  map.set('mantle', {
+    primary:  createPublicClient({ chain: mantle, transport: http(PUBLIC_RPCS.mantle.primary, { timeout: 10_000 }) }) as unknown as PublicClient,
+    fallback: createPublicClient({ chain: mantle, transport: http(PUBLIC_RPCS.mantle.fallback, { timeout: 10_000 }) }) as unknown as PublicClient,
+  });
+
+  // ─── Gnosis ───────────────────────────────────────────────────────────────
+  map.set('gnosis', {
+    primary:  createPublicClient({ chain: gnosis, transport: http(PUBLIC_RPCS.gnosis.primary, { timeout: 10_000 }) }) as unknown as PublicClient,
+    fallback: createPublicClient({ chain: gnosis, transport: http(PUBLIC_RPCS.gnosis.fallback, { timeout: 10_000 }) }) as unknown as PublicClient,
+  });
+
+  // ─── Metis ────────────────────────────────────────────────────────────────
+  map.set('metis', {
+    primary:  createPublicClient({ chain: metis, transport: http(PUBLIC_RPCS.metis.primary, { timeout: 10_000 }) }) as unknown as PublicClient,
+    fallback: createPublicClient({ chain: metis, transport: http(PUBLIC_RPCS.metis.fallback, { timeout: 10_000 }) }) as unknown as PublicClient,
+  });
+
+  // ─── Boba ────────────────────────────────────────────────────────────────
+  map.set('boba', {
+    primary:  createPublicClient({ chain: boba, transport: http(PUBLIC_RPCS.boba.primary, { timeout: 10_000 }) }) as unknown as PublicClient,
+    fallback: createPublicClient({ chain: boba, transport: http(PUBLIC_RPCS.boba.fallback, { timeout: 10_000 }) }) as unknown as PublicClient,
+  });
+
+  // ─── Blast ────────────────────────────────────────────────────────────────
+  map.set('blast', {
+    primary:  createPublicClient({ chain: blast, transport: http(PUBLIC_RPCS.blast.primary, { timeout: 10_000 }) }) as unknown as PublicClient,
+    fallback: createPublicClient({ chain: blast, transport: http(PUBLIC_RPCS.blast.fallback, { timeout: 10_000 }) }) as unknown as PublicClient,
+  });
+
+  // ─── Mode ────────────────────────────────────────────────────────────────
+  map.set('mode', {
+    primary:  createPublicClient({ chain: mode, transport: http(PUBLIC_RPCS.mode.primary, { timeout: 10_000 }) }) as unknown as PublicClient,
+    fallback: createPublicClient({ chain: mode, transport: http(PUBLIC_RPCS.mode.fallback, { timeout: 10_000 }) }) as unknown as PublicClient,
+  });
 
   return map;
 }
@@ -344,6 +444,14 @@ export class RpcManager {
     if (url.includes('llamarpc')) return 'LlamaRPC';
     if (url.includes('binance') || url.includes('bsc')) return 'Binance';
     if (url.includes('avax') || url.includes('drpc')) return 'Avalanche';
+    if (url.includes('zksync') || url.includes('era.zksync')) return 'zkSync';
+    if (url.includes('linea') || url.includes('linea.build')) return 'Linea';
+    if (url.includes('scroll') || url.includes('mode.network')) return 'Scroll/Mode';
+    if (url.includes('mantle')) return 'Mantle';
+    if (url.includes('gnosis')) return 'Gnosis';
+    if (url.includes('metis')) return 'Metis';
+    if (url.includes('boba')) return 'Boba';
+    if (url.includes('blast')) return 'Blast';
     return 'public';
   }
 }

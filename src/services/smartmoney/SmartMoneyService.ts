@@ -116,6 +116,11 @@ class SmartMoneyService {
   /**
    * Load entity-library addresses that qualify as smart money.
    * Cached for 10 minutes to avoid repeated DB scans.
+   *
+   * NOTE: Chain filter is intentionally omitted here — smart money addresses
+   * are tracked chain-agnostically. A VC/fund address on Ethereum will also
+   * appear on L2s and other EVM chains. All qualified entities are loaded
+   * regardless of their chain field.
    */
   private async loadDynamicWallets(): Promise<SmartMoneyAddress[]> {
     const cacheKey = 'dynamic-wallets';
@@ -130,7 +135,6 @@ class SmartMoneyService {
          FROM entities
          WHERE entity_type IN ('fund', 'dao', 'institution', 'kol')
            AND confidence IN ('high', 'medium')
-           AND chain IN ('ethereum', 'multi')
            AND source NOT IN ('scamsniffer', 'mew-darklist', 'forta-github')
          ORDER BY address,
            CASE confidence WHEN 'high' THEN 0 ELSE 1 END,
@@ -240,6 +244,9 @@ class SmartMoneyService {
     }
 
     // Unified query: static OR dynamic JOIN
+    // NOTE: Chain filter is intentionally omitted from the dynamic entity subquery.
+    // Smart money addresses are tracked chain-agnostically — a fund/VC address
+    // on Ethereum may also appear on any EVM chain (Base, Arbitrum, zkSync, etc.).
     const staticCond = staticAddrs.length > 0
       ? `(wa.from_address IN (${staticPhs}) OR wa.to_address IN (${staticPhs}))`
       : 'FALSE';
@@ -249,7 +256,6 @@ class SmartMoneyService {
           SELECT 1 FROM entities e
           WHERE e.entity_type IN (${typePhs})
             AND e.confidence IN ('high','medium')
-            AND e.chain IN (wa.chain, 'multi')
             AND (e.address = wa.from_address OR e.address = wa.to_address)
         )`
       : 'FALSE';

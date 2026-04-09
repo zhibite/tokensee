@@ -24,7 +24,10 @@ const VALID_EVENT_TYPES = [
   'large_transfer', 'exchange_inflow', 'exchange_outflow',
   'whale_movement', 'bridge_deposit', 'bridge_withdrawal',
 ];
-const VALID_CHAINS = ['ethereum', 'bsc', 'arbitrum', 'polygon', 'base', 'optimism', 'avalanche'];
+const VALID_CHAINS = [
+  'ethereum', 'bsc', 'arbitrum', 'polygon', 'base', 'optimism', 'avalanche',
+  'zksync', 'linea', 'scroll', 'zkevm', 'mantle', 'gnosis', 'metis', 'boba', 'blast', 'mode',
+];
 
 // POST /v1/webhooks — register a new webhook
 webhookRoutes.post('/', async (req: Request, res: Response) => {

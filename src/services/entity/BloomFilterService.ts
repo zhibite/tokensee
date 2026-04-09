@@ -31,7 +31,10 @@ const REDIS_KEY = 'bloom:entities';
 const REDIS_TTL = 7200; // 2 hours
 
 // All chains — used to expand 'multi' entries
-const ALL_CHAINS = ['ethereum', 'bsc', 'arbitrum', 'polygon', 'base', 'optimism', 'avalanche'];
+const ALL_CHAINS: string[] = [
+  'ethereum', 'bsc', 'arbitrum', 'polygon', 'base', 'optimism', 'avalanche',
+  'zksync', 'linea', 'scroll', 'zkevm', 'mantle', 'gnosis', 'metis', 'boba', 'blast', 'mode',
+];
 
 // Expected maximum entries (plan for 10M to avoid resizing)
 const EXPECTED_ENTRIES = 10_000_000;

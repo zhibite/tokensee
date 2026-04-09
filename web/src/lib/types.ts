@@ -1,5 +1,6 @@
 export type SupportedChain =
-  | 'ethereum' | 'bsc' | 'arbitrum' | 'polygon' | 'base' | 'optimism' | 'avalanche';
+  | 'ethereum' | 'bsc' | 'arbitrum' | 'polygon' | 'base' | 'optimism' | 'avalanche'
+  | 'zksync' | 'linea' | 'scroll' | 'zkevm' | 'mantle' | 'gnosis' | 'metis' | 'boba' | 'blast' | 'mode';
 
 export interface AssetAmount {
   address: string;

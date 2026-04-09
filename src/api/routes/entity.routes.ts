@@ -14,7 +14,10 @@ const VALID_TYPES   = [
   'oracle','dao','other','institution','kol','hacker','miner','token','sanctioned',
 ];
 const VALID_CONFS   = ['high','medium','low'];
-const SUPPORTED_CHAINS = ['ethereum','bsc','arbitrum','polygon','base','optimism','avalanche','multi'];
+const SUPPORTED_CHAINS = [
+  'ethereum','bsc','arbitrum','polygon','base','optimism','avalanche',
+  'zksync','linea','scroll','zkevm','mantle','gnosis','metis','boba','blast','mode','multi',
+];
 
 // ─── GET /v1/entity/stats ────────────────────────────────────────────────────
 entityRoutes.get('/stats', async (_req: Request, res: Response) => {
