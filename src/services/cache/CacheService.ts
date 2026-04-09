@@ -135,4 +135,5 @@ export const TTL = {
   TOKEN_METADATA: 86400,
   TOKEN_PRICE: 300,
   ENS: 3600,
+  ENTITY_STATS: 300,   // 5 min — invalidated when entities are added/updated/deleted
 } as const;

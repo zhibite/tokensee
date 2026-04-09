@@ -5,9 +5,14 @@ import { entityService } from '../../services/entity/EntityService.js';
 import { clusteringService } from '../../services/entity/ClusteringService.js';
 import { arkhamService } from '../../services/entity/ArkhamService.js';
 import { db } from '../../services/db/Database.js';
+import { CacheService, TTL } from '../../services/cache/CacheService.js';
 import type { ApiError } from '../../types/transaction.types.js';
 
 export const entityRoutes = Router();
+
+// Shared cache for stats (all callers share the same data)
+const statsCache = new CacheService('entity-stats');
+const STATS_CACHE_KEY = 'global';
 
 const VALID_TYPES   = [
   'exchange','protocol','bridge','fund','whale','mixer','nft','stablecoin',
@@ -21,29 +26,44 @@ const SUPPORTED_CHAINS = [
 
 // ─── GET /v1/entity/stats ────────────────────────────────────────────────────
 entityRoutes.get('/stats', async (_req: Request, res: Response) => {
+  // Fast path: serve from cache
+  const cached = await statsCache.get<{
+    total: number;
+    by_type: Record<string, number>;
+    by_source: Record<string, number>;
+    by_chain: Record<string, number>;
+  }>(STATS_CACHE_KEY);
+  if (cached) {
+    return res.json({ success: true, data: cached });
+  }
+
+  // Cache miss — run aggregation queries
   try {
-    const [byType, bySource, byChain, total] = await Promise.all([
+    // Single-pass aggregation: collect all dimensions at once
+    const [byTypeRows, bySourceRows, byChainRows, totalRow] = await Promise.all([
       db.query<{ entity_type: string; cnt: string }>(
-        `SELECT entity_type, COUNT(*) AS cnt FROM entities GROUP BY entity_type ORDER BY cnt DESC`
+        `SELECT entity_type, COUNT(*) AS cnt FROM entities GROUP BY entity_type ORDER BY cnt DESC`,
       ),
       db.query<{ source: string; cnt: string }>(
-        `SELECT source, COUNT(*) AS cnt FROM entities GROUP BY source ORDER BY cnt DESC`
+        `SELECT source, COUNT(*) AS cnt FROM entities GROUP BY source ORDER BY cnt DESC`,
       ),
       db.query<{ chain: string; cnt: string }>(
-        `SELECT chain, COUNT(*) AS cnt FROM entities GROUP BY chain ORDER BY cnt DESC`
+        `SELECT chain, COUNT(*) AS cnt FROM entities GROUP BY chain ORDER BY cnt DESC`,
       ),
       db.queryOne<{ cnt: string }>(`SELECT COUNT(*) AS cnt FROM entities`),
     ]);
 
-    return res.json({
-      success: true,
-      data: {
-        total: parseInt(total?.cnt ?? '0', 10),
-        by_type:   Object.fromEntries(byType.rows.map((r) => [r.entity_type, parseInt(r.cnt, 10)])),
-        by_source: Object.fromEntries(bySource.rows.map((r) => [r.source, parseInt(r.cnt, 10)])),
-        by_chain:  Object.fromEntries(byChain.rows.map((r) => [r.chain, parseInt(r.cnt, 10)])),
-      },
-    });
+    const data = {
+      total: parseInt(totalRow?.cnt ?? '0', 10),
+      by_type:   Object.fromEntries(byTypeRows.rows.map((r)  => [r.entity_type, parseInt(r.cnt, 10)])),
+      by_source: Object.fromEntries(bySourceRows.rows.map((r) => [r.source,     parseInt(r.cnt, 10)])),
+      by_chain:  Object.fromEntries(byChainRows.rows.map((r)  => [r.chain,      parseInt(r.cnt, 10)])),
+    };
+
+    // Populate cache (5 min TTL) — non-blocking
+    statsCache.set(STATS_CACHE_KEY, data, TTL.ENTITY_STATS).catch(() => {});
+
+    return res.json({ success: true, data });
   } catch (err) {
     const error: ApiError = { success: false, error: { code: 'DB_ERROR', message: 'Database unavailable' } };
     return res.status(503).json(error);
@@ -180,6 +200,8 @@ entityRoutes.post('/', async (req: Request, res: Response) => {
        RETURNING id`,
       [address.toLowerCase(), chain, label.trim(), entity_name.trim(), entity_type, confidence, tags]
     );
+    // Invalidate stats cache so next request picks up new row counts
+    statsCache.del(STATS_CACHE_KEY).catch(() => {});
     return res.status(201).json({ success: true, data: { id: result.rows[0].id, address: address.toLowerCase(), chain } });
   } catch {
     const error: ApiError = { success: false, error: { code: 'DB_ERROR', message: 'Failed to save entity' } };
@@ -187,7 +209,6 @@ entityRoutes.post('/', async (req: Request, res: Response) => {
   }
 });
 
-// ─── PUT /v1/entity/:address — update label ───────────────────────────────────
 entityRoutes.put('/:address', async (req: Request, res: Response) => {
   const address = String(req.params.address ?? '');
   const chain   = String(req.query.chain ?? 'ethereum').toLowerCase();
@@ -224,6 +245,7 @@ entityRoutes.put('/:address', async (req: Request, res: Response) => {
     if ((result.rowCount ?? 0) === 0) {
       return res.status(404).json({ success: false, error: { code: 'ENTITY_NOT_FOUND', message: 'Entity not found in DB' } });
     }
+    statsCache.del(STATS_CACHE_KEY).catch(() => {});
     return res.json({ success: true, data: { updated: true } });
   } catch {
     const error: ApiError = { success: false, error: { code: 'DB_ERROR', message: 'Update failed' } };
@@ -249,6 +271,7 @@ entityRoutes.delete('/:address', async (req: Request, res: Response) => {
     if ((result.rowCount ?? 0) === 0) {
       return res.status(404).json({ success: false, error: { code: 'ENTITY_NOT_FOUND', message: 'Entity not found' } });
     }
+    statsCache.del(STATS_CACHE_KEY).catch(() => {});
     return res.json({ success: true, data: { deleted: true } });
   } catch {
     const error: ApiError = { success: false, error: { code: 'DB_ERROR', message: 'Delete failed' } };

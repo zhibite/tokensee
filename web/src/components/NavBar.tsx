@@ -1,65 +1,8 @@
 'use client';
 
 import Link from 'next/link';
-import { useState, useRef, useEffect, type KeyboardEvent } from 'react';
-import { useRouter, usePathname } from 'next/navigation';
-
-const ADDRESS_RE = /^0x[0-9a-fA-F]{40}$/;
-
-function AddressSearch() {
-  const [value, setValue]   = useState('');
-  const [error, setError]   = useState(false);
-  const inputRef            = useRef<HTMLInputElement>(null);
-  const router              = useRouter();
-
-  const go = () => {
-    const v = value.trim();
-    if (!ADDRESS_RE.test(v)) { setError(true); return; }
-    setError(false);
-    setValue('');
-    router.push(`/address/${v.toLowerCase()}`);
-  };
-
-  const onKey = (e: KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter') go();
-    if (error) setError(false);
-  };
-
-  return (
-    <div className="relative flex items-center">
-      <svg
-        width="13" height="13" viewBox="0 0 16 16" fill="none"
-        className="absolute left-2.5 text-zinc-600 pointer-events-none"
-      >
-        <circle cx="6.5" cy="6.5" r="4.5" stroke="currentColor" strokeWidth="1.4"/>
-        <path d="M10 10l3 3" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/>
-      </svg>
-      <input
-        ref={inputRef}
-        value={value}
-        onChange={(e) => { setValue(e.target.value); setError(false); }}
-        onKeyDown={onKey}
-        placeholder="0x address…"
-        spellCheck={false}
-        className={`pl-7 pr-2 py-1 w-36 focus:w-52 transition-all duration-200 rounded-md text-xs font-mono
-          bg-zinc-900 border ${error ? 'border-red-700' : 'border-zinc-700'}
-          text-zinc-300 placeholder-zinc-600
-          focus:outline-none focus:border-zinc-500`}
-      />
-      {value && (
-        <button
-          onClick={go}
-          className="absolute right-1.5 text-zinc-500 hover:text-zinc-300 transition-colors"
-          title="Go to address"
-        >
-          <svg width="12" height="12" viewBox="0 0 16 16" fill="none">
-            <path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-          </svg>
-        </button>
-      )}
-    </div>
-  );
-}
+import { useState, useRef, useEffect } from 'react';
+import { usePathname } from 'next/navigation';
 
 interface DropdownItem {
   href: string;
@@ -167,9 +110,6 @@ export function NavBar() {
             tokensee
           </span>
         </Link>
-
-        {/* Address search */}
-        <AddressSearch />
 
         {/* Nav links */}
         <div className="flex items-center gap-5 text-sm text-zinc-500">
