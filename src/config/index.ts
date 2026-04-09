@@ -23,6 +23,9 @@ const envSchema = z.object({
   ALCHEMY_BASE_URL: z.string().url().optional().or(z.literal('')),
   ALCHEMY_OPTIMISM_URL: z.string().url().optional().or(z.literal('')),
   ALCHEMY_AVALANCHE_URL: z.string().url().optional().or(z.literal('')),
+  ALCHEMY_ZKSYNC_URL: z.string().url().optional().or(z.literal('')),
+  ALCHEMY_LINEA_URL: z.string().url().optional().or(z.literal('')),
+  ALCHEMY_SCROLL_URL: z.string().url().optional().or(z.literal('')),
 
   // External APIs
   COINGECKO_API_KEY: z.string().optional(),

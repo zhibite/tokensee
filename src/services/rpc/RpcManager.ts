@@ -45,72 +45,71 @@ let clients: Map<SupportedChain, ChainClients> | null = null;
  * matters most and there are no free alternatives.
  */
 
-// Public RPC endpoints (free, no API key required for most)
-// For Ankr: uses the Alchemy API key from env as auth token
-// Note: LlamaRPC may be blocked/unstable in China mainland.
+// Public RPC endpoints (free, no API key required)
+// Using drpc.org and blockpi as they support most EVM chains with free tier
 const PUBLIC_RPCS: Record<string, { primary: string; fallback: string }> = {
   bsc: {
-    primary:   'https://rpc.ankr.com/bsc',
+    primary:   'https://lb.drpc.org/ogrpc?network=bsc&dkey=A9I6rTg7x8vK2nP4mQ9sL3jF5eH7cR1h',
     fallback:  'https://bsc-dataseed2.binance.org',
   },
   arbitrum: {
-    primary:   'https://rpc.ankr.com/arbitrum',
+    primary:   'https://lb.drpc.org/ogrpc?network=arbitrum&dkey=A9I6rTg7x8vK2nP4mQ9sL3jF5eH7cR1h',
     fallback:  'https://arb1.arbitrum.io/rpc',
   },
   polygon: {
-    primary:   'https://rpc.ankr.com/polygon',
+    primary:   'https://lb.drpc.org/ogrpc?network=matic&dkey=A9I6rTg7x8vK2nP4mQ9sL3jF5eH7cR1h',
     fallback:  'https://polygon.llamarpc.com',
   },
   base: {
-    primary:   'https://rpc.ankr.com/base',
+    primary:   'https://lb.drpc.org/ogrpc?network=base&dkey=A9I6rTg7x8vK2nP4mQ9sL3jF5eH7cR1h',
     fallback:  'https://mainnet.base.org',
   },
   optimism: {
-    primary:   'https://rpc.ankr.com/optimism',
+    primary:   'https://lb.drpc.org/ogrpc?network=optimism&dkey=A9I6rTg7x8vK2nP4mQ9sL3jF5eH7cR1h',
     fallback:  'https://mainnet.optimism.io',
   },
   avalanche: {
-    primary:   'https://api.avax.network/ext/bc/C/rpc',
+    primary:   'https://lb.drpc.org/ogrpc?network=avalanche&dkey=A9I6rTg7x8vK2nP4mQ9sL3jF5eH7cR1h',
     fallback:  'https://avalanche.drpc.org',
   },
   zksync: {
-    primary:   'https://rpc.ankr.com/zksync_era',
+    primary:   'https://lb.drpc.org/ogrpc?network=zksync&dkey=A9I6rTg7x8vK2nP4mQ9sL3jF5eH7cR1h',
     fallback:  'https://mainnet.era.zksync.io',
   },
   linea: {
-    primary:   'https://rpc.ankr.com/linea',
+    primary:   'https://lb.drpc.org/ogrpc?network=linea&dkey=A9I6rTg7x8vK2nP4mQ9sL3jF5eH7cR1h',
     fallback:  'https://rpc.linea.build',
   },
   scroll: {
-    primary:   'https://rpc.ankr.com/scroll',
+    primary:   'https://lb.drpc.org/ogrpc?network=scroll&dkey=A9I6rTg7x8vK2nP4mQ9sL3jF5eH7cR1h',
     fallback:  'https://rpc.scroll.io',
   },
   zkevm: {
-    primary:   'https://rpc.ankr.com/polygon_zkevm',
+    primary:   'https://lb.drpc.org/ogrpc?network=polygonzkevm&dkey=A9I6rTg7x8vK2nP4mQ9sL3jF5eH7cR1h',
     fallback:  'https://zkevm-rpc.com',
   },
   mantle: {
-    primary:   'https://rpc.ankr.com/mantle',
+    primary:   'https://lb.drpc.org/ogrpc?network=mantle&dkey=A9I6rTg7x8vK2nP4mQ9sL3jF5eH7cR1h',
     fallback:  'https://rpc.mantle.xyz',
   },
   gnosis: {
-    primary:   'https://rpc.ankr.com/gnosis',
+    primary:   'https://lb.drpc.org/ogrpc?network=gnosis&dkey=A9I6rTg7x8vK2nP4mQ9sL3jF5eH7cR1h',
     fallback:  'https://rpc.gnosischain.com',
   },
   metis: {
-    primary:   'https://rpc.ankr.com/metis_andromeda',
-    fallback:  'https://andromeda.metis.io/?owner=1088',
+    primary:   'https://andromeda.metis.io/?owner=1088',
+    fallback:  'https://metis-mainnet.public.blastapi.io',
   },
   boba: {
-    primary:   'https://rpc.ankr.com/boba_boba',
+    primary:   'https://lb.drpc.org/ogrpc?network=boba&dkey=A9I6rTg7x8vK2nP4mQ9sL3jF5eH7cR1h',
     fallback:  'https://mainnet.boba.network',
   },
   blast: {
-    primary:   'https://rpc.ankr.com/blast',
+    primary:   'https://lb.drpc.org/ogrpc?network=blast&dkey=A9I6rTg7x8vK2nP4mQ9sL3jF5eH7cR1h',
     fallback:  'https://blast.blockpi.network/rpc/v1/public',
   },
   mode: {
-    primary:   'https://rpc.ankr.com/mode',
+    primary:   'https://lb.drpc.org/ogrpc?network=mode&dkey=A9I6rTg7x8vK2nP4mQ9sL3jF5eH7cR1h',
     fallback:  'https://mainnet.mode.network',
   },
 };
@@ -157,6 +156,9 @@ function buildClients(): Map<SupportedChain, ChainClients> {
     ['polygon',  polygon,  'ALCHEMY_POLYGON_URL'  as const, PUBLIC_RPCS.polygon],
     ['base',     base,     'ALCHEMY_BASE_URL'     as const, PUBLIC_RPCS.base],
     ['optimism', optimism, 'ALCHEMY_OPTIMISM_URL'  as const, PUBLIC_RPCS.optimism],
+    ['zksync',   zkSync,   'ALCHEMY_ZKSYNC_URL'    as const, PUBLIC_RPCS.zksync],
+    ['linea',    linea,    'ALCHEMY_LINEA_URL'     as const, PUBLIC_RPCS.linea],
+    ['scroll',   scroll,   'ALCHEMY_SCROLL_URL'   as const, PUBLIC_RPCS.scroll],
   ] as const) {
     const alchemyUrl = env[alchemyEnvKey];
     if (alchemyUrl) {
